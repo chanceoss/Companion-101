@@ -1,0 +1,13 @@
+{
+  "canvas": [1312, 1199],
+  "eyes": [[0.321, 0.401, 0.109, 0.111], [0.585, 0.401, 0.109, 0.111]],
+  "states": {
+    "idle": {"frames": ["biscuit.png"], "fps": 8},
+    "walking": {"frames": ["biscuit.png"], "fps": 10},
+    "happy": {"frames": ["biscuit.png"], "fps": 12},
+    "sleeping": {"frames": ["biscuit.png"], "fps": 6},
+    "dragged": {"frames": ["biscuit.png"], "fps": 8},
+    "entering": {"frames": ["biscuit.png"], "fps": 12},
+    "leaving": {"frames": ["biscuit.png"], "fps": 12}
+  }
+}
