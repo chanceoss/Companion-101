@@ -14,7 +14,7 @@ def test_entry_and_affection_finish_and_restore_idle():
     assert animation.state == "idle"
 
 
-@pytest.mark.parametrize("state", ["idle", "walking", "happy", "sleeping", "dragged", "entering", "leaving"])
+@pytest.mark.parametrize("state", ["idle", "walking", "happy", "sleeping", "dragged", "entering", "leaving", "exploring", "working", "greeting", "following"])
 def test_animation_remains_finite_and_visible(state):
     animation = Animator()
     animation.set_state(state)

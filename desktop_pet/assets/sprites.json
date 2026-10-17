@@ -3,7 +3,9 @@
   "eyes": [[0.321, 0.401, 0.109, 0.111], [0.585, 0.401, 0.109, 0.111]],
   "atlases": {
     "walk": {"file": "walk-cycle.png", "columns": 4, "rows": 3,
-             "row_edges": [0, 0.34, 0.637, 1]}
+             "row_edges": [0, 0.34, 0.637, 1]},
+    "activities": {"file": "activities.png", "columns": 5, "rows": 1,
+                   "column_edges": [0, 0.21869, 0.40585, 0.60244, 0.82021, 1]}
   },
   "states": {
     "idle": {"frames": ["biscuit.png"], "fps": 8},
@@ -32,7 +34,11 @@
       }
     },
     "happy": {"frames": ["biscuit.png"], "fps": 12},
-    "sleeping": {"frames": ["biscuit.png"], "fps": 6},
+    "exploring": {"frames": [{"atlas": "activities", "column": 0, "row": 0}], "fps": 8, "eyes": []},
+    "working": {"frames": [{"atlas": "activities", "column": 1, "row": 0}], "fps": 8, "eyes": []},
+    "greeting": {"frames": [{"atlas": "activities", "column": 2, "row": 0}], "fps": 8, "eyes": []},
+    "sleeping": {"frames": [{"atlas": "activities", "column": 3, "row": 0}], "fps": 6, "eyes": []},
+    "following": {"frames": [{"atlas": "activities", "column": 4, "row": 0}], "fps": 8, "eyes": []},
     "dragged": {"frames": ["biscuit.png"], "fps": 8},
     "entering": {"frames": ["biscuit.png"], "fps": 12},
     "leaving": {"frames": ["biscuit.png"], "fps": 12}

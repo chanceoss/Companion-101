@@ -36,7 +36,11 @@ class Application:
         self.menu.addSeparator()
         self.wander = self.action("Explore desktop", self.set_wander, checkable=True)
         self.wander.setChecked(self.settings.get("wander"))
+        self.work_action = self.action("Work with me · 25 min", lambda: self.activate_activity("work"), checkable=True)
+        self.action("Say hi", lambda: self.activate_activity("greet"))
         self.sleep_action = self.action("Take a nap / wake up", self.toggle_sleep)
+        self.follow_action = self.action("Follow me", lambda: self.activate_activity("follow"), checkable=True)
+        self.action("Rest here / stop activity", lambda: self.activate_activity("idle"))
         self.pass_through = self.action("Click through pet", self.set_click_through, checkable=True)
         self.action("Hide pet", self.hide_pet)
         self.menu.addSeparator()
@@ -53,6 +57,7 @@ class Application:
         self.pet.menu_requested.connect(lambda point: self.menu.popup(point))
         self.pet.position_saved.connect(self.save_position)
         self.pet.state_changed.connect(self.panel.set_state)
+        self.pet.activity_changed.connect(self.sync_activity)
         self.pet.hidden_to_tray.connect(self.on_hidden)
         self.panel.summon_requested.connect(self.summon)
         self.panel.pet_requested.connect(self.show_love)
@@ -63,6 +68,7 @@ class Application:
         self.panel.clear_requested.connect(self.companion.clear)
         self.panel.quit_requested.connect(self.quit)
         self.panel.focus_requested.connect(self.toggle_focus)
+        self.panel.activity_requested.connect(self.activate_activity)
         self.companion.answered.connect(self.answer)
         self.companion.failed.connect(lambda message: self.panel.add_message("Connection", message, error=True))
         self.companion.busy_changed.connect(self.panel.set_busy)
@@ -70,6 +76,7 @@ class Application:
         self.focus_timer = QTimer(app)
         self.focus_timer.timeout.connect(self.focus_tick)
         self.focus_timer.start(1000)
+        self.sync_activity(self.pet.activity)
         app.screenRemoved.connect(lambda _: QTimer.singleShot(100, self.pet.restore_position))
         app.aboutToQuit.connect(self.cleanup)
         self.pet.show()
@@ -77,8 +84,12 @@ class Application:
             self.panel.show()
         self.hello_timer = QTimer(self.pet)
         self.hello_timer.setSingleShot(True)
-        self.hello_timer.timeout.connect(lambda: self.pet.say("Hi, I’m Biscuit! Drag me anywhere. Double-click to chat. 🐾"))
+        self.hello_timer.timeout.connect(self.welcome)
         self.hello_timer.start(800)
+
+    def welcome(self):
+        if self.pet.activity in ("idle", "explore") and not self.pet.greeting_until:
+            self.pet.say(f"Hi, I’m {self.settings.get('name')}! Drag me anywhere. Double-click to chat. 🐾")
 
     def action(self, title, callback, checkable=False):
         action = QAction(title, self.menu)
@@ -110,11 +121,9 @@ class Application:
         self.pet.pet()
 
     def toggle_sleep(self):
-        if not self.pet.isVisible():
-            self.summon()
-        self.pet.sleep(self.pet.animator.state != "sleeping")
+        self.activate_activity("nap")
 
-    def set_wander(self, enabled):
+    def sync_wander(self, enabled):
         self.settings.update(wander=enabled)
         self.wander.blockSignals(True)
         self.wander.setChecked(enabled)
@@ -122,6 +131,49 @@ class Application:
         self.panel.wander.blockSignals(True)
         self.panel.wander.setChecked(enabled)
         self.panel.wander.blockSignals(False)
+
+    def set_wander(self, enabled):
+        if enabled:
+            self.activate_activity("explore", toggle=False)
+        elif self.pet.activity == "explore":
+            self.activate_activity("idle")
+        else:
+            self.sync_wander(False)
+
+    def sync_activity(self, key):
+        self.panel.set_activity(key)
+        for action, activity in ((self.work_action, "work"), (self.follow_action, "follow")):
+            action.setChecked(self.pet.activity == activity)
+        self.sleep_action.setText("Wake up" if self.pet.activity == "nap" else "Take a nap")
+
+    def stop_focus(self):
+        self.focus_deadline = None
+        self.panel.focus.setText("◷  Focus together · 25 min")
+
+    def activate_activity(self, key, toggle=True):
+        if key not in ("idle", "explore", "work", "greet", "nap", "follow"):
+            raise ValueError(f"Unknown companion activity: {key}")
+        if not self.pet.isVisible():
+            self.summon()
+        if key == "greet":
+            self.pet.greet()
+            return
+        if toggle and key != "idle" and self.pet.activity == key:
+            key = "idle"
+        self.stop_focus()
+        self.sync_wander(key == "explore")
+        self.pet.set_activity(key)
+        if key == "work":
+            self.focus_deadline = time.monotonic() + 25 * 60
+            self.focus_tick()
+        messages = {
+            "explore": "Time for a tiny adventure. I’ll see what’s around!",
+            "work": "Laptop ready! One small task, twenty-five cozy minutes. Let’s do this.",
+            "nap": "Curling up for a little nap. Wake me whenever you need me…",
+            "follow": "Lead the way with your mouse. I’ll follow at a comfy distance. Choose Rest here to stop.",
+            "idle": "I’ll stay right here. Tiny paws, excellent company.",
+        }
+        self.pet.say(messages[key])
 
     def set_scale(self, scale):
         self.pet.set_scale(scale)
@@ -142,14 +194,7 @@ class Application:
             self.pet.set_state("happy")
 
     def toggle_focus(self):
-        if self.focus_deadline:
-            self.focus_deadline = None
-            self.panel.focus.setText("◷  Focus together · 25 min")
-            self.pet.say("Focus session paused. We can start fresh anytime.")
-        else:
-            self.focus_deadline = time.monotonic() + 25 * 60
-            self.pet.say("One small task. Twenty-five cozy minutes. Let’s do this!")
-            self.focus_tick()
+        self.activate_activity("work")
 
     def focus_tick(self):
         if self.focus_deadline is None:
@@ -157,8 +202,8 @@ class Application:
         remaining = max(0, math.ceil(self.focus_deadline - time.monotonic()))
         self.panel.focus.setText(f"◷  {remaining // 60:02d}:{remaining % 60:02d} · Stop")
         if remaining == 0:
-            self.focus_deadline = None
-            self.panel.focus.setText("◷  Focus together · 25 min")
+            self.stop_focus()
+            self.pet.set_activity("idle")
             message = "You did it! Time for a stretch and a tiny celebration."
             self.pet.say(message)
             if self.pet.animator.state != "sleeping":

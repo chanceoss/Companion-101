@@ -46,7 +46,15 @@ class Animator:
             wave = math.sin(t * 16)
             return Pose(-abs(wave) * 16, wave * 6, 1 + wave * .035, 1 - wave * .035, blink=blink)
         if self.state == "sleeping":
-            return Pose(2, -5, 1.04, .93 + math.sin(t * 2) * .012, blink=True)
+            breath = math.sin(t * 1.7)
+            return Pose(1, 0, 1 + breath * .007, 1 + breath * .014, blink=True)
+        if self.state == "working":
+            return Pose(math.sin(t * 5) * .65, 0, 1, 1 + math.sin(t * 2) * .003)
+        if self.state == "greeting":
+            wave = math.sin(t * 9)
+            return Pose(-abs(wave) * 4, wave * 2.5, 1 + wave * .008, 1 - wave * .008)
+        if self.state in ("exploring", "following"):
+            return Pose(math.sin(t * 2) * 1.2, math.sin(t) * .8)
         if self.state == "dragged":
             return Pose(0, math.sin(t * 9) * 9, .95, 1.05, blink=blink)
         if self.state in ("entering", "leaving"):
@@ -101,6 +109,44 @@ class WalkMotion:
         self.x = min(max(next_x, left), limit_x)
         self.y = min(max(next_y, top), limit_y)
         return round(self.x), round(self.y)
+
+
+@dataclass
+class FollowMotion:
+    """Follow a pointer without overshooting, crossing monitors, or crowding it."""
+    x: float
+    y: float
+    vx: float = 0
+    vy: float = 1
+    moving: bool = False
+
+    @property
+    def facing(self):
+        if abs(self.vx) >= abs(self.vy):
+            return "side"
+        return "front" if self.vy > 0 else "back"
+
+    def step(self, dt, pointer, bounds, width, height, speed=78):
+        left, top, right, bottom = bounds
+        px, py = pointer
+        if not (left <= px < right and top <= py < bottom):
+            self.moving = False
+            return round(self.x), round(self.y)
+        dx, dy = px - (self.x + width / 2), py - (self.y + height * .65)
+        distance = math.hypot(dx, dy)
+        # Hysteresis prevents repeated start/stop when the pointer barely moves.
+        stop = max(70, width * .33)
+        resume = stop + 25
+        if distance <= stop or (not self.moving and distance < resume):
+            self.moving = False
+            return round(self.x), round(self.y)
+        self.vx, self.vy = dx / distance, dy / distance
+        travel = min(max(0, dt) * speed, distance - stop)
+        x, y = clamp_position(self.x + self.vx * travel, self.y + self.vy * travel,
+                              left, top, right, bottom, width, height)
+        self.moving = math.hypot(x - self.x, y - self.y) > .001
+        self.x, self.y = x, y
+        return round(x), round(y)
 
 
 def offline_reply(message, name="Biscuit"):

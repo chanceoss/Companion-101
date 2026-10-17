@@ -2,9 +2,10 @@ import math
 import random
 import time
 from PySide6.QtCore import Qt, QPoint, QPointF, QRectF, QTimer, Signal
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen, QFont
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen, QFont, QCursor
 from PySide6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout
-from .model import Animator, WalkMotion, clamp_position
+from .model import Animator, WalkMotion, FollowMotion, clamp_position
+from .activities import SCENES
 
 
 class SpeechBubble(QWidget):
@@ -43,6 +44,7 @@ class PetWindow(QWidget):
     menu_requested = Signal(QPoint)
     position_saved = Signal(int, int)
     state_changed = Signal(str)
+    activity_changed = Signal(str)
     hidden_to_tray = Signal()
 
     def __init__(self, settings, sprites):
@@ -67,6 +69,9 @@ class PetWindow(QWidget):
         self.click_timer.timeout.connect(self.pet)
         self.direction = 1
         self.walk_motion = None
+        self.follow_motion = None
+        self.activity = "explore" if settings.get("wander") else "idle"
+        self.greeting_until = 0
         self.wander_until = 0
         self.next_wander = time.monotonic() + 8
         self.next_reminder = time.monotonic() + 25 * 60
@@ -106,6 +111,32 @@ class PetWindow(QWidget):
             self.walk_motion = None
         self.state_changed.emit(state)
 
+    @property
+    def display_activity(self):
+        return "greet" if self.greeting_until else self.activity
+
+    def set_activity(self, activity):
+        if activity not in SCENES or activity == "greet":
+            raise ValueError(f"Unknown persistent pet activity: {activity}")
+        self.activity = activity
+        self.greeting_until = 0
+        self.follow_motion = None
+        self.next_wander = time.monotonic() + .7
+        self.set_state(SCENES[activity])
+        self.activity_changed.emit(activity)
+
+    def restore_activity(self):
+        self.follow_motion = None
+        self.set_state("greeting" if self.greeting_until else SCENES[self.activity])
+
+    def greet(self):
+        # A greeting briefly overlays the current activity without losing its timer.
+        self.greeting_until = time.monotonic() + 4
+        self.set_state("greeting")
+        self.particles.extend([(random.uniform(.3, .7), i * -.12) for i in range(4)])
+        self.activity_changed.emit("greet")
+        self.say(f"Hi, friend! {self.settings.get('name')} is very happy to see you. 🧡")
+
     def start_walk(self, now):
         # Mostly horizontal strolls, with front/back and diagonal exploration too.
         vector = random.choice(((1, 0), (-1, 0), (0, 1), (0, -1),
@@ -122,39 +153,63 @@ class PetWindow(QWidget):
         self.move(*self.walk_motion.step(dt, bounds, self.width(), self.height()))
         self.direction = -1 if self.walk_motion.vx < 0 else 1
 
+    def advance_follow(self, dt, pointer):
+        if self.follow_motion is None:
+            self.follow_motion = FollowMotion(self.x(), self.y())
+        area = self.screen().availableGeometry()
+        bounds = (area.left(), area.top(), area.right() + 1, area.bottom() + 1)
+        self.move(*self.follow_motion.step(dt, (pointer.x(), pointer.y()), bounds,
+                                          self.width(), self.height()))
+        state = "walking" if self.follow_motion.moving else "following"
+        if self.animator.state != state:
+            self.set_state(state)
+        if self.follow_motion.moving:
+            self.walk_motion = self.follow_motion
+            self.direction = -1 if self.follow_motion.vx < 0 else 1
+
     @property
     def walk_facing(self):
         return self.walk_motion.facing if self.walk_motion else "side"
 
     def tick(self):
         now = time.monotonic()
-        dt = min(.1, now - self._last)
+        dt = max(0, min(.1, now - self._last))
         self._last = now
         if not self.isVisible():
             return
+        if self.greeting_until and now >= self.greeting_until:
+            self.greeting_until = 0
+            if self.animator.state not in ("leaving", "dragged"):
+                self.restore_activity()
+            self.activity_changed.emit(self.activity)
         state = self.animator.state
         if state == "leaving" and self.animator.elapsed >= .6:
             self.hide()
             self.bubble.hide()
             self.hidden_to_tray.emit()
             return
-        if self.settings.get("wander") and state in ("idle", "walking"):
-            if now >= self.next_wander and state == "idle":
+        if self.activity == "follow" and state in ("idle", "walking", "following") and not self.greeting_until:
+            self.advance_follow(dt, QCursor.pos())
+        elif self.activity == "explore" and state in ("idle", "walking", "exploring") and not self.greeting_until:
+            if now >= self.next_wander and state != "walking":
                 self.start_walk(now)
             if self.animator.state == "walking":
                 self.advance_walk(dt)
                 if now >= self.wander_until:
-                    self.set_state("idle")
+                    self.set_state("exploring")
                     self.next_wander = now + random.uniform(10, 25)
                     self.position_saved.emit(self.x(), self.y())
         elif state == "walking":
-            self.set_state("idle")
+            self.restore_activity()
         if self.settings.get("reminders") and now >= self.next_reminder and state != "sleeping":
             self.say("Time for a little stretch and a sip of water. You’ve earned a moment. 🧡")
             self.next_reminder = now + 25 * 60
         previous = self.animator.state
         self.pose = self.animator.advance(dt)
         if previous != self.animator.state:
+            if self.animator.state == "idle" and self.activity != "idle":
+                self.restore_activity()
+                self.pose = self.animator.advance(0)
             self.state_changed.emit(self.animator.state)
         self.particles = [(x, age + dt) for x, age in self.particles if age + dt < 1.3]
         self.update()
@@ -197,8 +252,8 @@ class PetWindow(QWidget):
             painter.drawText(QPointF(self.width() * x, self.height() * .4 - age * 60 * unit), "♥")
         if self.animator.state == "sleeping":
             painter.setOpacity(.8)
-            painter.setPen(QColor("#887b9b"))
-            painter.drawText(QPointF(self.width() * .72, 50 * unit + math.sin(self.animator.elapsed * 2) * 5), "z Z")
+            painter.setPen(QColor("#899cbb"))
+            painter.drawText(QPointF(self.width() * .72, self.height() - 165 * unit + math.sin(self.animator.elapsed * 2) * 5 * unit), "z Z")
 
     def pet(self):
         self.set_state("happy")
@@ -210,7 +265,7 @@ class PetWindow(QWidget):
             self.bubble.say(message, self)
 
     def sleep(self, enabled=True):
-        self.set_state("sleeping" if enabled else "idle")
+        self.set_activity("nap" if enabled else "idle")
         self.next_wander = time.monotonic() + 10
         self.say("Just resting my eyes… zzz" if enabled else "Ready for a little adventure!")
 
@@ -255,7 +310,7 @@ class PetWindow(QWidget):
             self.setCursor(Qt.OpenHandCursor)
             if self.dragged:
                 self.keep_on_screen()
-                self.set_state("idle")
+                self.restore_activity()
                 self.position_saved.emit(self.x(), self.y())
                 self.next_wander = time.monotonic() + 10
             else:

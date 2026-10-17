@@ -28,10 +28,10 @@ def test_directional_cycle_uses_distinct_frames_and_loops(app):
     assert sprites.frame("unknown", 0).cacheKey() == sprites.frame("idle", 0).cacheKey()
 
 
-@pytest.mark.parametrize("broken", ["cell", "direction", "row_edges", "path"])
+@pytest.mark.parametrize("broken", ["cell", "direction", "row_edges", "column_edges", "path"])
 def test_bad_sprite_configuration_reports_actionable_error(app, tmp_path, broken):
     config = json.loads((ASSETS / "sprites.json").read_text())
-    for filename in ("biscuit.png", "walk-cycle.png"):
+    for filename in ("biscuit.png", "walk-cycle.png", "activities.png"):
         shutil.copyfile(ASSETS / filename, tmp_path / filename)
     if broken == "cell":
         config["states"]["walking"]["frames"][0]["column"] = 100
@@ -42,9 +42,23 @@ def test_bad_sprite_configuration_reports_actionable_error(app, tmp_path, broken
     elif broken == "row_edges":
         config["atlases"]["walk"]["row_edges"] = [0, .6, .5, 1]
         expected = "row_edges"
+    elif broken == "column_edges":
+        config["atlases"]["activities"]["column_edges"] = [0, .9, .8, .7, .6, 1]
+        expected = "column_edges"
     else:
         config["atlases"]["walk"]["file"] = "../outside.png"
         expected = "inside the asset directory"
     (tmp_path / "sprites.json").write_text(json.dumps(config))
     with pytest.raises(ValueError, match=expected):
         SpriteBank(tmp_path)
+
+
+def test_activity_art_has_five_distinct_transparent_scenes(app):
+    sprites = SpriteBank()
+    scenes = ("exploring", "working", "greeting", "sleeping", "following")
+    assert len({sprites.frame(scene, 0).cacheKey() for scene in scenes}) == 5
+    for scene in scenes:
+        frame = sprites.frame(scene, 0).toImage()
+        assert frame.hasAlphaChannel()
+        assert frame.pixelColor(0, 0).alpha() == 0
+        assert sprites.eyes(scene) == []

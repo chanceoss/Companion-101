@@ -48,11 +48,15 @@ class SpriteBank:
         if (len(edges) != rows + 1 or edges[0] != 0 or edges[-1] != 1
                 or any(a >= b for a, b in zip(edges, edges[1:]))):
             raise ValueError("Atlas row_edges must increase from 0 to 1 and describe every row.")
+        columns = spec.get("column_edges", [i / cols for i in range(cols + 1)])
+        if (len(columns) != cols + 1 or columns[0] != 0 or columns[-1] != 1
+                or any(a >= b for a, b in zip(columns, columns[1:]))):
+            raise ValueError("Atlas column_edges must increase from 0 to 1 and describe every column.")
         cells = {}
         # Integer boundaries also handle image sizes not divisible by the grid.
         for row in range(rows):
             for col in range(cols):
-                left, right = col * sheet.width() // cols, (col + 1) * sheet.width() // cols
+                left, right = round(columns[col] * sheet.width()), round(columns[col + 1] * sheet.width())
                 top, bottom = round(edges[row] * sheet.height()), round(edges[row + 1] * sheet.height())
                 cell = sheet.copy(left, top, right - left, bottom - top)
                 alpha = cell.toImage().createAlphaMask(Qt.ThresholdAlphaDither)

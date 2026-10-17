@@ -1,12 +1,13 @@
 import html
 import math
 import sys
-from PySide6.QtCore import Qt, QRectF, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QLinearGradient
+from PySide6.QtCore import Qt, QRectF, QTimer, Signal, QSize
+from PySide6.QtGui import QColor, QFont, QPainter, QLinearGradient, QPen
 from PySide6.QtWidgets import (QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton,
     QTabWidget, QFrame, QTextBrowser, QLineEdit, QCheckBox, QSlider, QFormLayout,
-    QMessageBox, QScrollArea)
+    QScrollArea, QAbstractButton, QSizePolicy)
 from .storage import startup_enabled, set_startup
+from .activities import ACTIVITIES, BY_KEY, SCENES
 
 STYLE = """
 QWidget { color: #46382f; font-family: 'Segoe UI'; font-size: 13px; }
@@ -63,12 +64,60 @@ def button(text, callback, primary=False):
     return widget
 
 
+class ActivityButton(QAbstractButton):
+    """Native keyboard-accessible activity tile with a reference-inspired illustration."""
+    def __init__(self, activity, sprites, parent=None):
+        super().__init__(parent)
+        self.activity = activity
+        self.sprite = sprites.frame(activity.scene, 0)
+        self.setText(activity.title)
+        self.setAccessibleName(activity.title)
+        self.setToolTip(activity.description)
+        self.setCheckable(True)
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setMinimumSize(76, 130)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+    def sizeHint(self):
+        return QSize(105, 134)
+
+    def enterEvent(self, event):
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+        if self.isChecked() or self.underMouse() or self.hasFocus():
+            p.setBrush(QColor("#fffaf0"))
+            p.setPen(QPen(QColor("#b88b5d" if self.isChecked() or self.hasFocus() else "#e5d6c1"), 1.2))
+            p.drawRoundedRect(QRectF(1, 1, self.width() - 2, self.height() - 2), 14, 14)
+        size = min(self.width() - 8, 98)
+        left = (self.width() - size) / 2
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(self.activity.color))
+        p.drawEllipse(QRectF(left + 3, 10, size - 6, size - 8))
+        p.setPen(QColor("#fffdfa"))
+        p.setFont(QFont("Segoe UI", 12))
+        p.drawText(QRectF(left + 5, 10, 20, 20), Qt.AlignCenter, "✧")
+        p.drawPixmap(QRectF(left, 5, size, size), self.sprite, QRectF(self.sprite.rect()))
+        p.setPen(QColor("#82552e" if self.isChecked() else "#65503c"))
+        p.setFont(QFont("Segoe UI", 9, QFont.DemiBold if self.isChecked() else QFont.Normal))
+        p.drawText(QRectF(3, 103, self.width() - 6, 28), Qt.AlignHCenter | Qt.AlignTop | Qt.TextWordWrap, self.text())
+
+
 class Portrait(QWidget):
     def __init__(self, sprites):
         super().__init__()
         self.sprites = sprites
-        self.setFixedHeight(230)
+        self.setFixedHeight(190)
         self.t = 0
+        self.activity = "idle"
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.animate)
 
@@ -80,6 +129,11 @@ class Portrait(QWidget):
 
     def animate(self):
         self.t += .05
+        self.update()
+
+    def set_activity(self, activity):
+        self.activity = activity
+        self.t = 0
         self.update()
 
     def paintEvent(self, event):
@@ -100,13 +154,14 @@ class Portrait(QWidget):
         p.setPen(Qt.NoPen)
         p.setBrush(QColor(131, 117, 77, 20))
         p.drawEllipse(QRectF(self.width() / 2 - 79, self.height() - 27, 158, 12))
-        pixmap = self.sprites.frame("idle", 0)
-        w = 224
+        pixmap = self.sprites.frame(SCENES[self.activity], self.t)
+        w = 184
         h = w * pixmap.height() / pixmap.width()
         p.drawPixmap(QRectF((self.width() - w) / 2, self.height() - h - 19 + math.sin(self.t * 2) * 2, w, h), pixmap, QRectF(pixmap.rect()))
         p.setPen(QColor("#85906e"))
         p.setFont(QFont("Segoe UI", 8))
-        p.drawText(15, self.height() - 16, "YOUR LITTLE DESKTOP COMPANION")
+        caption = BY_KEY[self.activity].title.upper() if self.activity in BY_KEY else "YOUR LITTLE DESKTOP COMPANION"
+        p.drawText(15, self.height() - 16, caption)
 
 
 class ControlPanel(QWidget):
@@ -120,6 +175,7 @@ class ControlPanel(QWidget):
     preferences_saved = Signal()
     focus_requested = Signal()
     quit_requested = Signal()
+    activity_requested = Signal(str)
 
     def __init__(self, settings, sprites, companion):
         super().__init__()
@@ -128,8 +184,8 @@ class ControlPanel(QWidget):
         self.companion = companion
         self.setObjectName("panel")
         self.setWindowTitle("Biscuit · A little company")
-        self.setMinimumSize(480, 650)
-        self.resize(540, 820)
+        self.setMinimumSize(540, 650)
+        self.resize(640, 880)
         self.setStyleSheet(STYLE)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(27, 24, 27, 18)
@@ -167,7 +223,8 @@ class ControlPanel(QWidget):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 18, 0, 8)
         layout.setSpacing(15)
-        layout.addWidget(Portrait(sprites))
+        self.portrait = Portrait(sprites)
+        layout.addWidget(self.portrait)
         name_row = QHBoxLayout()
         names = QVBoxLayout()
         self.pet_name = label(self.settings.get("name"), "title")
@@ -182,7 +239,20 @@ class ControlPanel(QWidget):
         actions.addWidget(button("♡  Give a little love", self.pet_requested.emit, True), 1)
         actions.addWidget(button("↗  Bring me back", self.summon_requested.emit), 1)
         layout.addLayout(actions)
-        layout.addWidget(label("LITTLE RITUALS", "section"))
+        layout.addWidget(label("WHAT SHALL WE DO?", "section"))
+        activity_row = QHBoxLayout()
+        activity_row.setSpacing(5)
+        self.activity_buttons = {}
+        for activity in ACTIVITIES:
+            tile = ActivityButton(activity, sprites)
+            tile.clicked.connect(lambda checked=False, key=activity.key: self.activity_requested.emit(key))
+            activity_row.addWidget(tile, 1)
+            self.activity_buttons[activity.key] = tile
+        self.sleep_button = self.activity_buttons["nap"]
+        layout.addLayout(activity_row)
+        self.activity_hint = label("Choose a little adventure, or just keep me nearby.", "hint")
+        self.activity_hint.setWordWrap(True)
+        layout.addWidget(self.activity_hint)
         card = QFrame()
         card.setObjectName("card")
         rows = QVBoxLayout(card)
@@ -195,8 +265,8 @@ class ControlPanel(QWidget):
         row = QHBoxLayout()
         self.focus = button("◷  Focus together · 25 min", self.focus_requested.emit)
         row.addWidget(self.focus, 1)
-        self.sleep_button = button("☾  Take a nap", self.sleep_requested.emit)
-        row.addWidget(self.sleep_button)
+        self.rest_button = button("Rest here", lambda: self.activity_requested.emit("idle"))
+        row.addWidget(self.rest_button)
         rows.addLayout(row)
         layout.addWidget(card)
         hint = label("Drag to move  ·  Click to pet  ·  Double-click to chat\nRight-click for more  ·  Find me in your system tray", "hint")
@@ -308,9 +378,16 @@ class ControlPanel(QWidget):
         self.chat_info.setText("AI enabled · Messages are sent to your configured provider." if ai else "Offline companion · Cozy preset replies, entirely on your device.")
 
     def set_state(self, state):
-        titles = {"sleeping": "Dreaming", "walking": "Exploring", "happy": "Feeling loved", "dragged": "Wheee!", "idle": "Feeling cozy", "entering": "Hello there", "leaving": "See you soon"}
+        titles = {"sleeping": "Dreaming", "walking": "On a stroll", "happy": "Feeling loved", "dragged": "Wheee!", "idle": "Feeling cozy", "entering": "Hello there", "leaving": "See you soon", "working": "Working together", "greeting": "Hello, friend!", "exploring": "Looking around", "following": "Right behind you"}
         self.state.setText("●  " + titles.get(state, state.title()))
-        self.sleep_button.setText("☀  Wake up" if state == "sleeping" else "☾  Take a nap")
+
+    def set_activity(self, key):
+        for activity, tile in self.activity_buttons.items():
+            tile.setChecked(activity == key)
+        self.portrait.set_activity(key)
+        self.activity_hint.setText(BY_KEY[key].description if key in BY_KEY else "Resting right here. Choose an activity whenever you like.")
+        self.sleep_button.setText("Wake up" if key == "nap" else "Take a nap")
+        self.sleep_button.setAccessibleName(self.sleep_button.text())
 
     def add_message(self, who, message, mine=False, error=False):
         color = "#a76248" if mine else "#6c815b"
