@@ -2,9 +2,9 @@ import math
 import random
 import time
 from PySide6.QtCore import Qt, QPoint, QPointF, QRectF, QTimer, Signal
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen, QFont, QCursor
-from PySide6.QtWidgets import QApplication, QWidget, QMenu, QLabel, QVBoxLayout
-from .model import Animator, clamp_position
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen, QFont
+from PySide6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout
+from .model import Animator, WalkMotion, clamp_position
 
 
 class SpeechBubble(QWidget):
@@ -55,7 +55,8 @@ class PetWindow(QWidget):
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setMouseTracking(True)
         self.setCursor(Qt.OpenHandCursor)
-        self.animator = Animator()
+        walking = sprites.spec("walking")
+        self.animator = Animator(walking["fps"], len(walking["frames"]))
         self.pose = self.animator.advance(0)
         self.bubble = SpeechBubble()
         self.drag_offset = None
@@ -65,12 +66,12 @@ class PetWindow(QWidget):
         self.click_timer.setSingleShot(True)
         self.click_timer.timeout.connect(self.pet)
         self.direction = 1
+        self.walk_motion = None
         self.wander_until = 0
         self.next_wander = time.monotonic() + 8
         self.next_reminder = time.monotonic() + 25 * 60
         self.particles = []
         self.click_through = False
-        self._subpixel = 0.0
         self._last = time.monotonic()
         self.set_scale(settings.get("scale"))
         self.restore_position()
@@ -101,7 +102,29 @@ class PetWindow(QWidget):
 
     def set_state(self, state):
         self.animator.set_state(state)
+        if state != "walking":
+            self.walk_motion = None
         self.state_changed.emit(state)
+
+    def start_walk(self, now):
+        # Mostly horizontal strolls, with front/back and diagonal exploration too.
+        vector = random.choice(((1, 0), (-1, 0), (0, 1), (0, -1),
+                                (2, 1), (-2, 1), (1, -2), (-1, -2)))
+        self.walk_motion = WalkMotion(self.x(), self.y(), *vector)
+        self.wander_until = now + random.uniform(3, 7)
+        self.set_state("walking")
+
+    def advance_walk(self, dt):
+        if self.walk_motion is None:
+            self.walk_motion = WalkMotion(self.x(), self.y(), self.direction, 0)
+        area = self.screen().availableGeometry()
+        bounds = (area.left(), area.top(), area.right() + 1, area.bottom() + 1)
+        self.move(*self.walk_motion.step(dt, bounds, self.width(), self.height()))
+        self.direction = -1 if self.walk_motion.vx < 0 else 1
+
+    @property
+    def walk_facing(self):
+        return self.walk_motion.facing if self.walk_motion else "side"
 
     def tick(self):
         now = time.monotonic()
@@ -117,20 +140,9 @@ class PetWindow(QWidget):
             return
         if self.settings.get("wander") and state in ("idle", "walking"):
             if now >= self.next_wander and state == "idle":
-                self.set_state("walking")
-                self.wander_until = now + random.uniform(3, 7)
-                self.direction = random.choice((-1, 1))
+                self.start_walk(now)
             if self.animator.state == "walking":
-                self._subpixel += dt * 42 * self.direction
-                dx = int(self._subpixel)
-                self._subpixel -= dx
-                area = self.screen().availableGeometry()
-                next_x = self.x() + dx
-                if next_x < area.left() or next_x + self.width() > area.right() + 1:
-                    self.direction *= -1
-                    self._subpixel = 0
-                else:
-                    self.move(next_x, self.y())
+                self.advance_walk(dt)
                 if now >= self.wander_until:
                     self.set_state("idle")
                     self.next_wander = now + random.uniform(10, 25)
@@ -157,16 +169,17 @@ class PetWindow(QWidget):
         painter.translate(self.width() / 2, self.height() - 20 * unit + pose.bob * unit)
         painter.rotate(pose.rotation)
         painter.scale(pose.sx, pose.sy)
-        if self.animator.state == "walking" and self.direction < 0:
+        walking = self.animator.state == "walking"
+        if walking and self.walk_facing == "side" and self.direction < 0:
             painter.scale(-1, 1)
-        pixmap = self.sprites.frame(self.animator.state, self.animator.elapsed)
+        pixmap = self.sprites.frame(self.animator.state, self.animator.elapsed, self.walk_facing)
         width = 255 * unit
         height = width * pixmap.height() / pixmap.width()
         rect = QRectF(-width / 2, -height, width, height)
         painter.drawPixmap(rect, pixmap, QRectF(pixmap.rect()))
         # Coordinates live in the manifest so replacement art can move the eyelids.
         if pose.blink:
-            for ex, ey, ew, eh in self.sprites.manifest.get("eyes", []):
+            for ex, ey, ew, eh in self.sprites.eyes(self.animator.state):
                 eye = QRectF(rect.x() + ex * width, rect.y() + ey * height, ew * width, eh * height)
                 painter.setPen(Qt.NoPen)
                 painter.setBrush(QColor("#eda33f"))

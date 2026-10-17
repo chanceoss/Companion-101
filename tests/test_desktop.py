@@ -1,10 +1,14 @@
 import time
+import pytest
 from PySide6.QtCore import Qt, QPoint
 from PySide6.QtGui import QImage
 from PySide6.QtTest import QTest
 from desktop_pet.app import Application
 from desktop_pet.storage import Settings
 from desktop_pet.sprites import ASSETS
+from desktop_pet.sprites import SpriteBank
+from desktop_pet.pet import PetWindow
+from desktop_pet.model import WalkMotion
 
 
 def test_native_desktop_flow(app, tmp_path):
@@ -92,3 +96,41 @@ def test_drag_and_double_click(app, tmp_path):
         controller.pet.deleteLater()
         controller.panel.deleteLater()
         controller.menu.deleteLater()
+
+
+@pytest.mark.parametrize("vector,facing", [((1, 0), "side"), ((-1, 0), "side"),
+                                          ((0, 1), "front"), ((0, -1), "back")])
+def test_wandering_moves_and_animates_in_each_direction(app, tmp_path, monkeypatch, vector, facing):
+    settings = Settings(tmp_path)
+    settings.update(wander=True)
+    pet = PetWindow(settings, SpriteBank())
+    pet.timer.stop()
+    pet.show()
+    pet.move(200, 100)
+    try:
+        clock = [1000.0]
+        monkeypatch.setattr("desktop_pet.pet.time.monotonic", lambda: clock[0])
+        pet.set_state("walking")
+        pet.walk_motion = WalkMotion(pet.x(), pet.y(), *vector)
+        pet.wander_until = 1010
+        pet._last = 999.95
+        start = pet.pos()
+        pet.tick()
+        assert pet.walk_facing == facing
+        assert (pet.x() - start.x()) * vector[0] + (pet.y() - start.y()) * vector[1] > 0
+        first = pet.grab().toImage()
+        for _ in range(3):
+            clock[0] += .05
+            pet.tick()
+        assert pet.grab().toImage() != first
+        pet.sleep()
+        frozen = pet.pos()
+        clock[0] += .05
+        pet.tick()
+        assert pet.pos() == frozen
+        assert pet.walk_motion is None
+    finally:
+        pet.hide()
+        pet.bubble.hide()
+        pet.bubble.deleteLater()
+        pet.deleteLater()

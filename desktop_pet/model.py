@@ -15,12 +15,14 @@ class Pose:
 
 
 class Animator:
-    def __init__(self):
+    def __init__(self, walk_fps=8, walk_frames=4):
         self.state = "entering"
         self.elapsed = 0.0
         self.clock = 0.0
         self.blink_at = 2.8
         self.rng = random.Random()
+        self.walk_fps = walk_fps
+        self.walk_frames = max(1, walk_frames)
 
     def set_state(self, state):
         if state != self.state:
@@ -37,8 +39,9 @@ class Animator:
         t = self.elapsed
         blink = self.blink_at <= self.clock <= self.blink_at + .16
         if self.state == "walking":
-            wave = math.sin(t * 13)
-            return Pose(-abs(wave) * 7, wave * 4, 1 + abs(wave) * .025, 1 - abs(wave) * .025, blink=blink)
+            # Secondary motion follows the gait instead of rocking the whole body.
+            wave = math.sin(t * math.tau * self.walk_fps / self.walk_frames)
+            return Pose(-abs(wave) * 2, wave * 1.2, 1 + abs(wave) * .008, 1 - abs(wave) * .008, blink=blink)
         if self.state == "happy":
             wave = math.sin(t * 16)
             return Pose(-abs(wave) * 16, wave * 6, 1 + wave * .035, 1 - wave * .035, blink=blink)
@@ -59,6 +62,45 @@ def clamp_position(x, y, left, top, right, bottom, width, height):
     """Keep window inside a screen's usable area, including negative monitor origins."""
     return (min(max(x, left), max(left, right - width)),
             min(max(y, top), max(top, bottom - height)))
+
+
+@dataclass
+class WalkMotion:
+    """Float positions preserve smooth slow movement; right/bottom are exclusive."""
+    x: float
+    y: float
+    vx: float
+    vy: float
+
+    def __post_init__(self):
+        length = math.hypot(self.vx, self.vy)
+        if not length or not math.isfinite(length):
+            raise ValueError("A walking direction must be finite and nonzero.")
+        self.vx /= length
+        self.vy /= length
+
+    @property
+    def facing(self):
+        if abs(self.vx) >= abs(self.vy):
+            return "side"
+        return "front" if self.vy > 0 else "back"
+
+    @property
+    def mirrored(self):
+        return self.facing == "side" and self.vx < 0
+
+    def step(self, dt, bounds, width, height, speed=42):
+        left, top, right, bottom = bounds
+        limit_x, limit_y = max(left, right - width), max(top, bottom - height)
+        next_x = self.x + self.vx * max(0, dt) * speed
+        next_y = self.y + self.vy * max(0, dt) * speed
+        if next_x < left or next_x > limit_x:
+            self.vx *= -1
+        if next_y < top or next_y > limit_y:
+            self.vy *= -1
+        self.x = min(max(next_x, left), limit_x)
+        self.y = min(max(next_y, top), limit_y)
+        return round(self.x), round(self.y)
 
 
 def offline_reply(message, name="Biscuit"):
