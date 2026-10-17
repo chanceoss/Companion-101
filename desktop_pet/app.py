@@ -148,7 +148,7 @@ class Application:
 
     def stop_focus(self):
         self.focus_deadline = None
-        self.panel.focus.setText("◷  Focus together · 25 min")
+        self.panel.set_focus_remaining(None)
 
     def activate_activity(self, key, toggle=True):
         if key not in ("idle", "explore", "work", "greet", "nap", "follow"):
@@ -200,7 +200,7 @@ class Application:
         if self.focus_deadline is None:
             return
         remaining = max(0, math.ceil(self.focus_deadline - time.monotonic()))
-        self.panel.focus.setText(f"◷  {remaining // 60:02d}:{remaining % 60:02d} · Stop")
+        self.panel.set_focus_remaining(remaining)
         if remaining == 0:
             self.stop_focus()
             self.pet.set_activity("idle")

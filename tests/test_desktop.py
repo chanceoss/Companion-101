@@ -42,7 +42,7 @@ def test_native_desktop_flow(app, tmp_path):
         controller.set_wander(False)
         pet.tick()
         assert pet.animator.state == "idle"
-        controller.panel.tabs.setCurrentIndex(1)
+        assert controller.panel.chat_panel.isVisible()
         controller.panel.input.setText("hello")
         controller.panel.send()
         assert "Hi, friend!" in controller.panel.transcript.toPlainText()
@@ -87,7 +87,8 @@ def test_drag_and_double_click(app, tmp_path):
         assert controller.settings.get("x") is not None
         QTest.mouseDClick(pet, Qt.LeftButton, pos=QPoint(140, 150))
         assert controller.panel.isVisible()
-        assert controller.panel.tabs.currentIndex() == 1
+        QTest.qWait(20)
+        assert controller.panel.input.hasFocus()
     finally:
         controller.cleanup()
         controller.focus_timer.stop()

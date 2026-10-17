@@ -13,7 +13,7 @@ dependencies = ["PySide6==6.8.3", "keyring==25.6.0"]
 biscuit = "desktop_pet.app:main"
 
 [tool.setuptools.package-data]
-desktop_pet = ["assets/*.png", "assets/*.json"]
+desktop_pet = ["assets/*.png", "assets/*.json", "assets/fonts/*.ttf", "assets/fonts/*.txt"]
 
 [tool.setuptools.packages.find]
 include = ["desktop_pet*"]

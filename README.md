@@ -20,16 +20,20 @@ py -3.12 -m venv .venv
 .venv\Scripts\python run_pet.py
 ```
 
-The companion panel opens on first launch. Closing that panel keeps the pet alive. Use **Quit** in the panel or tray menu to exit. A second launch brings the existing companion back instead of creating another pet. The pet has no taskbar button; its control panel has one.
+The companion panel opens on first launch. Biscuit and the activities live in the left sidebar; chat is visible beside them with avatars, timestamps, and message bubbles. The cream, sage, and garden design uses native Qt widgets and bundled rounded fonts. The sidebar scrolls on shorter windows while the chat composer stays visible. Windows supplies the normal title-bar controls.
+
+The **small gear button in the upper-right corner opens Preferences**. You can also use **Ctrl+,**. The former Preferences tab is now a separate, reusable settings window with the same name, size, reminders, Windows startup, and optional AI controls. **Save preferences** applies changes; **Close** or **Escape** dismisses the window. Pet size updates immediately as the slider moves.
+
+Closing the main panel keeps the pet alive. Use **Quit Biscuit** in Preferences or **Quit Biscuit** in the tray menu to exit. A second launch brings the existing companion back instead of creating another pet. The pet has no taskbar button; its control panel has one.
 
 ## Companion activities
 
-Choose an illustrated tile under **What shall we do?** in the Companion tab, or choose the same activity from the pet's right-click/tray menu. The active tile is highlighted and the hero portrait changes to match.
+Choose an illustrated activity tile in the left sidebar, or choose the same activity from the pet's right-click/tray menu. The cards are labeled **Explore**, **Work**, **Hi**, **Nap**, and **Follow**. The active tile is highlighted and the hero portrait changes to match. Clicking the large portrait gives Biscuit a little affection.
 
 | Activity | What Biscuit does |
 | --- | --- |
 | **Explore** | Takes short directional strolls and pauses to look around with a magnifying glass. Select again to rest. |
-| **Work with me** | Opens a little laptop, stays in place, and starts a 25-minute focus timer. Select again or use the timer's Stop button to cancel. |
+| **Work with me** | Opens a little laptop, stays in place, and starts a 25-minute focus timer. The Work card shows its countdown. Select again or use the timer's Stop button to cancel. |
 | **Say hi** | Plays a four-second waving greeting with floating hearts, then returns to the previous activity. A running focus timer continues through the greeting. |
 | **Take a nap** | Curls up with closed eyes and slow breathing. Select Wake up to return to rest. |
 | **Follow me** | Walks toward your mouse pointer and waits nearby, keeping a gap instead of covering the pointer. Select again or choose Rest here to stop. |
@@ -54,7 +58,7 @@ The Explore preference is remembered on restart. Work sessions, greetings, naps,
 | Explore desktop | Short horizontal, vertical, and diagonal strolls, with edge detection |
 | Take a nap / Wake up | Curled sleeping artwork with gentle breathing |
 | Focus together | Starts Work with me and its 25-minute timer; click again to cancel |
-| Preferences | Name, size, reminders, Windows startup, AI connection |
+| Upper-right gear / Ctrl+, | Opens Preferences: name, size, reminders, Windows startup, AI connection |
 
 The pet breathes, bobs, blinks, squashes, stretches, dangles when dragged, and animates when appearing/disappearing. Walking uses four frames per direction at 8 fps, with subtle motion synchronized to the gait. Biscuit faces forward when moving down the screen, away when moving up, and sideways when moving horizontally; leftward travel mirrors the right-facing cycle. Diagonal movement uses the dominant direction and the same overall speed as straight movement. Screen edges turn the pet around. Walking frames use their own eye configuration so front-facing idle eyelids never cover a side or back view.
 
@@ -70,7 +74,7 @@ The regular desktop always-on-top setting does not place the pet over Windows se
 
 For open-ended AI conversation:
 
-1. Open **Preferences** and enable **Use an OpenAI-compatible AI provider**.
+1. Click the **upper-right gear** to open **Preferences**, then enable **Use an OpenAI-compatible AI provider**.
 2. Enter a base URL (for example, `https://api.openai.com/v1`), a model supported by your account, and your API key. The default model is `gpt-4o-mini`; availability depends on the provider/account.
 3. Choose whether to remember the key, then **Save preferences**.
 
@@ -102,7 +106,7 @@ python3 -m venv .venv
 QT_QPA_PLATFORM=offscreen .venv/bin/python run_pet.py --smoke-test
 ```
 
-On Windows use `.venv\Scripts\python` instead. `--smoke-test` bypasses single-instance locking, renders the native widgets, and exits after two seconds. Tests cover all five native activity buttons, activity switching, greeting restoration, focus cancellation/completion, pointer-follow distance and monitor bounds, dragging during activities, animation transitions, all four walking directions, diagonal speed, edge turns, sprite looping and configuration errors, corrupted preferences, offline chat, clean shutdown, and real async requests against a local mock AI provider, including error responses. They do not call a paid provider.
+On Windows use `.venv\Scripts\python` instead. `--smoke-test` bypasses single-instance locking, renders the native widgets, and exits after two seconds. Tests cover the simultaneous companion/chat layout, gear navigation, Preferences saving/closing, resized windows, plain-text message wrapping, bundled fonts, all five activities, greeting restoration, focus timing, pointer following, dragging, directional walking, sprite configuration, corrupted preferences, offline chat, clean shutdown, and real async requests against a local mock AI provider. They do not call a paid provider.
 
 Linux offscreen tests verify the Qt application logic and rendering. **Windows tray behavior, transparent click handling, multiple physical monitors, logon startup, Credential Manager, and the packaged `.exe` require Windows acceptance testing.** A live paid-provider connection requires your configuration and has not been verified by the mock-server tests.
 
@@ -127,6 +131,7 @@ To regenerate the native-rendered walking preview with development dependencies 
 ```bash
 .venv/bin/python -m scripts.render_walk_preview
 .venv/bin/python -m scripts.render_activity_preview
+.venv/bin/python -m scripts.render_ui_preview
 ```
 
 ### Layout
@@ -137,7 +142,10 @@ desktop_pet/
   activities.py Shared activity titles, scenes, colors, and descriptions
   pet.py       Native transparent window, painting, input, movement
   model.py     Procedural animation, roaming motion, offline responses
-  panel.py     Native companion/chat/preferences widgets
+  panel.py     Two-column native panel, illustrated sidebar, settings gear
+  chat_widgets.py Native message bubbles, avatars, timestamps, chat scrolling
+  preferences.py Gear-opened Preferences window
+  theme.py     Native garden/icon painting and offline font loading
   ai.py        Async OpenAI-compatible client
   storage.py   Preferences and Windows logon startup
   sprites.py   Sprite manifest, atlas loading, directional frame selection
@@ -153,6 +161,7 @@ Biscuit.spec   Windows portable packaging configuration
 - Click, drag, double-click, sleep, hide, summon, and quit work.
 - Enable Explore desktop; verify front/back/side walking frames, left/right mirroring, and turns at all screen edges.
 - Try every activity tile and its matching tray action. Verify the laptop timer, greeting return, curled nap, mouse following, and Rest here controls.
+- Open Preferences using the small gear and Ctrl+,. Save settings, close with Escape, and confirm the pet continues running. Check chat and the composer at small and large window sizes.
 - Enable click-through; recover using the tray menu.
 - Drag across differently scaled monitors; disconnect a monitor and confirm recovery.
 - Save/restore position, size, and name; launch twice to confirm a single instance.
@@ -160,3 +169,5 @@ Biscuit.spec   Windows portable packaging configuration
 - Save/remove a test API key using Windows Credential Manager, then verify AI chat with your provider.
 
 No Windows binary or live Windows session is available in the Linux cloud environment; these platform-specific checks remain required before calling the Windows distribution release-verified.
+
+The bundled Fredoka and Nunito fonts use the SIL Open Font License. Their notices, upstream sources, and static-instance details are included in `desktop_pet/assets/fonts/` and travel with the packaged application.

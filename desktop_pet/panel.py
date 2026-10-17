@@ -1,49 +1,58 @@
-import html
+"""Native companion sidebar + chat, with Preferences behind the small gear button."""
 import math
-import sys
 from PySide6.QtCore import Qt, QRectF, QTimer, Signal, QSize
-from PySide6.QtGui import QColor, QFont, QPainter, QLinearGradient, QPen
-from PySide6.QtWidgets import (QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton,
-    QTabWidget, QFrame, QTextBrowser, QLineEdit, QCheckBox, QSlider, QFormLayout,
-    QScrollArea, QAbstractButton, QSizePolicy)
-from .storage import startup_enabled, set_startup
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QLinearGradient, QPen, QShortcut, QKeySequence
+from PySide6.QtWidgets import (QAbstractButton, QApplication, QFrame, QGridLayout,
+    QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QSizePolicy,
+    QToolButton, QVBoxLayout, QWidget)
 from .activities import ACTIVITIES, BY_KEY, SCENES
+from .chat_widgets import ChatHistory, ConversationFrame
+from .preferences import PreferencesDialog
+from .theme import garden, icon, load_fonts, paw, sparkle, ui_font
 
 STYLE = """
-QWidget { color: #46382f; font-family: 'Segoe UI'; font-size: 13px; }
-QWidget#panel { background: #faf8f3; }
-QLabel#eyebrow { color: #8d806f; font-size: 10px; font-weight: 700; letter-spacing: 2px; }
-QLabel#title { font-size: 25px; font-weight: 700; color: #3c3028; }
-QLabel#subtitle { color: #938778; font-size: 12px; }
-QLabel#pill { color: #5f7951; background: #eaf0e2; border-radius: 11px; padding: 5px 10px; font-size: 11px; }
-QLabel#section { color: #95846f; font-size: 10px; font-weight: 700; letter-spacing: 1px; }
-QLabel#cardTitle { font-size: 15px; font-weight: 600; }
-QLabel#hint { color: #968b7e; font-size: 11px; }
-QTabWidget::pane { border: 0; }
-QTabBar::tab { background: transparent; color: #9c8e7f; padding: 13px 18px; border-bottom: 2px solid #e9e3d9; font-weight: 600; }
-QTabBar::tab:selected { color: #9d6038; border-bottom: 2px solid #bd8555; font-weight: 600; }
-QFrame#card { border: 1px solid #e9e2d8; border-radius: 14px; background: #fffefa; }
-QPushButton { background: #f2ece2; border: 1px solid #e7dccb; border-radius: 10px; padding: 10px 15px; font-weight: 600; }
-QPushButton:hover { background: #e9dfcf; }
-QPushButton:pressed { background: #decdb5; }
-QPushButton:disabled { color: #b9ada0; background: #f2eee8; }
-QPushButton#primary { background: #ae7446; color: white; border: 1px solid #ae7446; }
-QPushButton#primary:hover { background: #98623a; }
-QPushButton#quiet { background: transparent; border: 0; color: #a78360; padding: 6px; }
-QLineEdit, QTextBrowser { background: #fffefa; border: 1px solid #e5dccf; border-radius: 9px; padding: 10px; selection-background-color: #d8b080; }
-QLineEdit:focus { border-color: #b98757; }
-QCheckBox { spacing: 9px; padding: 5px 0; }
-QCheckBox::indicator { width: 17px; height: 17px; border: 1px solid #d9cab5; border-radius: 5px; background: #fffefa; }
-QCheckBox::indicator:checked { background: #ae7446; border: 4px solid #e8d7bf; }
-QSlider::groove:horizontal { height: 5px; border-radius: 2px; background: #e7ddcd; }
-QSlider::sub-page:horizontal { background: #b98451; border-radius: 2px; }
-QSlider::handle:horizontal { width: 16px; margin: -6px 0; border-radius: 8px; background: #ae7446; }
-QScrollArea { border: 0; background: transparent; }
-QScrollArea > QWidget > QWidget { background: #faf8f3; }
-QScrollBar:vertical { width: 7px; background: transparent; }
-QScrollBar::handle:vertical { background: #dfd3c2; border-radius: 3px; min-height: 30px; }
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-QToolTip { background: #fff9ee; color: #46382f; border: 1px solid #dfd3c2; }
+QWidget {color: #674c3d; font-family: 'Nunito'; font-size: 15px;}
+QWidget#panel, QDialog#preferences {background: #fcf8f2;}
+QLabel#eyebrow {color: #967a69; font-size: 12px; font-weight: 800; letter-spacing: 2.5px;}
+QLabel#title {font-family: 'Fredoka'; color: #482b22; font-size: 43px; font-weight: 600;}
+QLabel#subtitle {color: #a38b7d; font-size: 19px;}
+QLabel#petName {font-family: 'Fredoka'; color: #482b22; font-size: 32px; font-weight: 600;}
+QLabel#petTagline {color: #957e6d; font-size: 15px;}
+QLabel#pill {color: #60824a; background: #edf3e3; border-radius: 19px; padding: 6px 15px; font-size: 17px; font-weight: 700;}
+QLabel#hint {color: #ab9585; font-size: 12px;}
+QLabel#state {color: #8f9c70; font-size: 12px;}
+QLabel#section {color: #a17f64; font-size: 11px; font-weight: 800; letter-spacing: 1.5px;}
+QLabel#dialogTitle {font-family: 'Fredoka'; color: #593b2c; font-size: 28px; font-weight: 500;}
+QFrame#chatPanel {background: #fffcf8; border: 1px solid #efe4d8; border-radius: 23px;}
+QLabel#chatTitle {color: #a9612d; font-size: 20px; font-weight: 800;}
+QFrame#composer {background: #fffdfa; border: 1px solid #ebdece; border-radius: 15px;}
+QLineEdit {background: #fffdf9; border: 1px solid #e5d6c5; border-radius: 10px; min-height: 22px; padding: 11px; selection-background-color: #e8d3b1;}
+QLineEdit:focus {border-color: #c98e55;}
+QFrame#composer QLineEdit {background: transparent; border: 0; min-height: 20px; padding: 8px 4px; font-size: 15px;}
+QPushButton {background: #fffaf2; border: 1px solid #eadac6; border-radius: 12px; padding: 9px 14px; font-weight: 700;}
+QPushButton:hover {background: #f5ead8; border-color: #d6ae7d;}
+QPushButton:pressed {background: #ecdbbf;}
+QPushButton:disabled {background: #f2ebe1; color: #bca792; border-color: #e9ded0;}
+QPushButton#primary {background: qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #c88b55,stop:1 #b87446); color: white; border: 1px solid #bd8050;}
+QPushButton#primary:hover {background: #ae7042;}
+QPushButton#primary:disabled {background: #d8b89b; color: #fff8ee; border-color: #d8b89b;}
+QPushButton#quiet {background: transparent; color: #ac8a6b; border: 0; padding: 6px; font-size: 12px;}
+QPushButton#focus {background: #f1f3e5; color: #7b855c; font-size: 13px;}
+QToolButton {background: transparent; border: 0; border-radius: 10px; padding: 6px;}
+QToolButton:hover {background: #f4eadc;}
+QToolButton#gear {background: #fff8ee; border: 1px solid #ecd7be; border-radius: 14px;}
+QToolButton#gear:hover {background: #f7e9d5; border-color: #dcb887;}
+QCheckBox {spacing: 9px; padding: 4px 0;}
+QCheckBox::indicator {width: 17px; height: 17px; border: 1px solid #d9c7af; border-radius: 5px; background: #fffdfa;}
+QCheckBox::indicator:checked {background: #b6824e; border: 4px solid #efdfc5;}
+QSlider::groove:horizontal {height: 5px; border-radius: 2px; background: #e7dccb;}
+QSlider::sub-page:horizontal {background: #c28b52; border-radius: 2px;}
+QSlider::handle:horizontal {width: 16px; margin: -6px 0; border-radius: 8px; background: #b87c43;}
+QScrollArea {background: transparent; border: 0;}
+QScrollBar:vertical {width: 6px; background: transparent;}
+QScrollBar::handle:vertical {background: #dfd3c1; border-radius: 3px; min-height: 28px;}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {height: 0;}
+QToolTip {background: #fff9ee; color: #62462f; border: 1px solid #dfcbb0; padding: 5px;}
 """
 
 
@@ -64,23 +73,30 @@ def button(text, callback, primary=False):
     return widget
 
 
+class BrandHeader(QWidget):
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        paw(p, 405, 26, 20, "#f4d6b2", 16)
+        paw(p, 391, 61, 18, "#f4d6b2", -20)
+
+
 class ActivityButton(QAbstractButton):
-    """Native keyboard-accessible activity tile with a reference-inspired illustration."""
     def __init__(self, activity, sprites, parent=None):
         super().__init__(parent)
         self.activity = activity
         self.sprite = sprites.frame(activity.scene, 0)
-        self.setText(activity.title)
+        self.setText({"work": "Work", "greet": "Hi", "nap": "Nap", "follow": "Follow"}.get(activity.key, "Explore"))
         self.setAccessibleName(activity.title)
         self.setToolTip(activity.description)
         self.setCheckable(True)
         self.setFocusPolicy(Qt.StrongFocus)
         self.setCursor(Qt.PointingHandCursor)
-        self.setMinimumSize(76, 130)
+        self.setMinimumSize(92, 117)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
     def sizeHint(self):
-        return QSize(105, 134)
+        return QSize(128, 130)
 
     def enterEvent(self, event):
         self.update()
@@ -93,31 +109,46 @@ class ActivityButton(QAbstractButton):
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
-        if self.isChecked() or self.underMouse() or self.hasFocus():
-            p.setBrush(QColor("#fffaf0"))
-            p.setPen(QPen(QColor("#b88b5d" if self.isChecked() or self.hasFocus() else "#e5d6c1"), 1.2))
-            p.drawRoundedRect(QRectF(1, 1, self.width() - 2, self.height() - 2), 14, 14)
-        size = min(self.width() - 8, 98)
-        left = (self.width() - size) / 2
+        selected = self.isChecked() or self.hasFocus()
+        p.setBrush(QColor("#fff8e9" if selected else "#fffaf4"))
+        p.setPen(QPen(QColor("#f3b15b" if selected else "#f2e9dd"), 1.8 if selected else .8))
+        p.drawRoundedRect(QRectF(1.5, 1.5, self.width() - 3, self.height() - 3), 24, 24)
+        size = min(self.width() - 15, self.height() - 30)
+        x = (self.width() - size) / 2
         p.setPen(Qt.NoPen)
         p.setBrush(QColor(self.activity.color))
-        p.drawEllipse(QRectF(left + 3, 10, size - 6, size - 8))
-        p.setPen(QColor("#fffdfa"))
-        p.setFont(QFont("Segoe UI", 12))
-        p.drawText(QRectF(left + 5, 10, 20, 20), Qt.AlignCenter, "✧")
-        p.drawPixmap(QRectF(left, 5, size, size), self.sprite, QRectF(self.sprite.rect()))
-        p.setPen(QColor("#82552e" if self.isChecked() else "#65503c"))
-        p.setFont(QFont("Segoe UI", 9, QFont.DemiBold if self.isChecked() else QFont.Normal))
-        p.drawText(QRectF(3, 103, self.width() - 6, 28), Qt.AlignHCenter | Qt.AlignTop | Qt.TextWordWrap, self.text())
+        p.drawEllipse(QRectF(x + 2, 7, size - 4, size - 4))
+        p.drawPixmap(QRectF(x, 3, size, size), self.sprite, QRectF(self.sprite.rect()))
+        p.setPen(QColor("#a65e27" if selected else "#8d7463"))
+        p.setFont(ui_font(16, 700 if selected else 600))
+        p.drawText(QRectF(2, self.height() - 29, self.width() - 4, 25), Qt.AlignCenter, self.text())
 
 
-class Portrait(QWidget):
+class GardenCard(QWidget):
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(self.rect()), 25, 25)
+        gradient = QLinearGradient(0, 0, 0, self.height())
+        gradient.setColorAt(0, QColor("#f0f1dd"))
+        gradient.setColorAt(.55, QColor("#fcf6e9"))
+        gradient.setColorAt(1, QColor("#f5f1dd"))
+        p.fillPath(path, gradient)
+        p.setClipPath(path)
+        garden(p, QRectF(self.rect()))
+
+
+class Portrait(QAbstractButton):
     def __init__(self, sprites):
         super().__init__()
         self.sprites = sprites
-        self.setFixedHeight(190)
-        self.t = 0
-        self.activity = "idle"
+        self.setFixedHeight(205)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setAccessibleName("Give Biscuit a little love")
+        self.setToolTip("Click to give a little love")
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.t, self.activity = 0, "idle"
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.animate)
 
@@ -132,36 +163,61 @@ class Portrait(QWidget):
         self.update()
 
     def set_activity(self, activity):
-        self.activity = activity
-        self.t = 0
+        self.activity, self.t = activity, 0
         self.update()
 
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
-        gradient = QLinearGradient(0, 0, self.width(), self.height())
-        gradient.setColorAt(0, QColor("#f2efdf"))
-        gradient.setColorAt(1, QColor("#e5ebd8"))
-        p.setBrush(gradient)
         p.setPen(Qt.NoPen)
-        p.drawRoundedRect(self.rect(), 18, 18)
-        p.setPen(QColor("#b7bd9e"))
-        p.setFont(QFont("Segoe UI", 16))
-        p.drawText(48, 70, "✧")
-        p.drawText(self.width() - 70, 155, "✦")
-        p.setFont(QFont("Segoe UI", 11))
-        p.drawText(self.width() - 100, 52, "✧")
+        p.setBrush(QColor("#fbf6df"))
+        for x, y, w, h in ((-20, 60, 80, 80), (18, 36, 65, 75), (55, 66, 50, 60)):
+            p.drawEllipse(QRectF(x, y, w, h))
+        p.setBrush(QColor("#e4eacd"))
+        p.drawEllipse(QRectF(-50, 153, self.width() + 65, 110))
+        sparkle(p, 38, 54, 12)
+        sparkle(p, self.width() - 52, 29, 9)
+        paw(p, self.width() - 32, 59, 19, "#edcd98", 10)
+        p.setBrush(QColor(133, 132, 83, 22))
+        p.drawEllipse(QRectF(self.width() / 2 - 68, self.height() - 18, 136, 11))
+        sprite = self.sprites.frame(SCENES[self.activity], self.t)
+        w = min(self.width() - 8, 225)
+        h = w * sprite.height() / sprite.width()
+        p.drawPixmap(QRectF((self.width() - w) / 2, self.height() - h - 12 + math.sin(self.t * 2) * 1.4, w, h), sprite, QRectF(sprite.rect()))
+        garden(p, QRectF(0, self.height() - 22, self.width(), 22), corner=True)
+        if self.hasFocus():
+            p.setBrush(Qt.NoBrush)
+            p.setPen(QPen(QColor("#d4b07b"), 1, Qt.DashLine))
+            p.drawRoundedRect(QRectF(3, 3, self.width() - 6, self.height() - 6), 16, 16)
+
+
+class ExploreButton(QAbstractButton):
+    def __init__(self):
+        super().__init__()
+        self.setCheckable(True)
+        self.setFixedHeight(72)
+        self.setAccessibleName("Explore desktop")
+        self.setToolTip("Start exploring the desktop; click again to rest")
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFocusPolicy(Qt.StrongFocus)
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        p.setPen(QPen(QColor("#e9d7be" if self.isChecked() or self.hasFocus() else "#efe2d3"), 1))
+        p.setBrush(QColor("#fffcf7"))
+        p.drawRoundedRect(QRectF(1, 1, self.width() - 2, self.height() - 2), 18, 18)
         p.setPen(Qt.NoPen)
-        p.setBrush(QColor(131, 117, 77, 20))
-        p.drawEllipse(QRectF(self.width() / 2 - 79, self.height() - 27, 158, 12))
-        pixmap = self.sprites.frame(SCENES[self.activity], self.t)
-        w = 184
-        h = w * pixmap.height() / pixmap.width()
-        p.drawPixmap(QRectF((self.width() - w) / 2, self.height() - h - 19 + math.sin(self.t * 2) * 2, w, h), pixmap, QRectF(pixmap.rect()))
-        p.setPen(QColor("#85906e"))
-        p.setFont(QFont("Segoe UI", 8))
-        caption = BY_KEY[self.activity].title.upper() if self.activity in BY_KEY else "YOUR LITTLE DESKTOP COMPANION"
-        p.drawText(15, self.height() - 16, caption)
+        p.setBrush(QColor("#fff0d4"))
+        p.drawRoundedRect(QRectF(14, 14, 44, 44), 13, 13)
+        paw(p, 25, 24, 23, "#c39465")
+        p.setPen(QColor("#614334"))
+        p.setFont(ui_font(15, 800))
+        p.drawText(QRectF(70, 15, self.width() - 98, 25), Qt.AlignVCenter, "Explore desktop")
+        p.setPen(QColor("#a48a73"))
+        p.setFont(ui_font(12))
+        p.drawText(QRectF(70, 39, self.width() - 90, 20), Qt.AlignVCenter, "Click to rest." if self.isChecked() else "Gentle stroll.")
+        icon("chevron", "#b29984", 18).paint(p, self.width() - 28, 27, 18, 18)
 
 
 class ControlPanel(QWidget):
@@ -179,203 +235,216 @@ class ControlPanel(QWidget):
 
     def __init__(self, settings, sprites, companion):
         super().__init__()
-        self.settings = settings
+        load_fonts()
+        self.settings, self.sprites, self.companion = settings, sprites, companion
         self.allow_close = False
-        self.companion = companion
         self.setObjectName("panel")
         self.setWindowTitle("Biscuit · A little company")
-        self.setMinimumSize(540, 650)
-        self.resize(640, 880)
+        self.setMinimumSize(840, 680)
+        available = QApplication.primaryScreen().availableGeometry()
+        self.resize(min(1100, available.width() - 64), min(960, available.height() - 64))
         self.setStyleSheet(STYLE)
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(27, 24, 27, 18)
-        outer.setSpacing(6)
-        head = QHBoxLayout()
-        titles = QVBoxLayout()
-        titles.addWidget(label("COMPANION / 101", "eyebrow"))
-        titles.addSpacing(4)
-        titles.addWidget(label("A little company.", "title"))
-        titles.addWidget(label("Small paws. A brighter workday.", "subtitle"))
-        head.addLayout(titles)
-        head.addStretch()
-        self.mode = label("●  Offline", "pill")
-        head.addWidget(self.mode, alignment=Qt.AlignTop)
-        outer.addLayout(head)
-        outer.addSpacing(13)
-        self.tabs = QTabWidget()
-        self.tabs.addTab(self.home_tab(sprites), "Companion")
-        self.tabs.addTab(self.chat_tab(), "Chat")
-        self.tabs.addTab(self.settings_tab(), "Preferences")
-        outer.addWidget(self.tabs, 1)
-        footer = QHBoxLayout()
-        footer.addWidget(label("Made for your desktop, and your day.", "hint"))
-        footer.addStretch()
-        quit_button = button("Quit", self.quit_requested.emit)
-        quit_button.setObjectName("quiet")
-        footer.addWidget(quit_button)
-        outer.addLayout(footer)
+        self.outer = QVBoxLayout(self)
+        self.outer.setContentsMargins(28, 20, 28, 12)
+        self.outer.setSpacing(20)
+        self.outer.addWidget(self.build_header())
+        body = QHBoxLayout()
+        body.setSpacing(18)
+        self.sidebar = self.build_sidebar()
+        self.sidebar.setFixedWidth(306)
+        body.addWidget(self.sidebar)
+        self.chat_panel = self.build_chat()
+        body.addWidget(self.chat_panel, 1)
+        self.outer.addLayout(body, 1)
+        footer = label("Drag Biscuit to move · Double-click the pet to chat · Right-click for more", "hint")
+        footer.setAlignment(Qt.AlignCenter)
+        self.outer.addWidget(footer)
+        self.preferences = PreferencesDialog(settings, companion, self)
+        self.preferences.scale_changed.connect(self.scale_changed.emit)
+        self.preferences.saved.connect(self.on_preferences_saved)
+        self.preferences.quit_requested.connect(self.quit_requested.emit)
+        self.preferences_shortcut = QShortcut(QKeySequence("Ctrl+,"), self)
+        self.preferences_shortcut.activated.connect(self.open_preferences)
         self.refresh_mode()
 
-    def home_tab(self, sprites):
+    def build_header(self):
+        header = BrandHeader()
+        row = QHBoxLayout(header)
+        row.setContentsMargins(0, 0, 0, 0)
+        titles = QVBoxLayout()
+        titles.setSpacing(1)
+        titles.addWidget(label("COMPANION / 101", "eyebrow"))
+        titles.addWidget(label("A little company.", "title"))
+        titles.addWidget(label("Small paws. A brighter workday.", "subtitle"))
+        row.addLayout(titles)
+        row.addStretch()
+        status = QHBoxLayout()
+        status.setSpacing(12)
+        self.mode = label("●  Offline", "pill")
+        self.mode.setFixedHeight(38)
+        status.addWidget(self.mode)
+        self.settings_button = QToolButton()
+        self.settings_button.setObjectName("gear")
+        self.settings_button.setIcon(icon("gear", size=27))
+        self.settings_button.setIconSize(QSize(27, 27))
+        self.settings_button.setFixedSize(46, 46)
+        self.settings_button.setAccessibleName("Open preferences")
+        self.settings_button.setToolTip("Preferences (Ctrl+,)")
+        self.settings_button.setFocusPolicy(Qt.StrongFocus)
+        self.settings_button.setCursor(Qt.PointingHandCursor)
+        self.settings_button.clicked.connect(self.open_preferences)
+        status.addWidget(self.settings_button)
+        row.addLayout(status)
+        return header
+
+    def build_sidebar(self):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(0, 18, 0, 8)
-        layout.setSpacing(15)
-        self.portrait = Portrait(sprites)
-        layout.addWidget(self.portrait)
-        name_row = QHBoxLayout()
-        names = QVBoxLayout()
-        self.pet_name = label(self.settings.get("name"), "title")
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setAccessibleName("Biscuit and activities")
+        scroll.viewport().setAutoFillBackground(False)
+        content = QWidget()
+        content.setObjectName("sidebarContents")
+        content.setStyleSheet("QWidget#sidebarContents {background: transparent;}")
+        content.setAutoFillBackground(False)
+        rows = QVBoxLayout(content)
+        rows.setContentsMargins(0, 0, 5, 0)
+        rows.setSpacing(10)
+        card = GardenCard()
+        card_rows = QVBoxLayout(card)
+        card_rows.setContentsMargins(13, 7, 13, 18)
+        card_rows.setSpacing(9)
+        self.portrait = Portrait(self.sprites)
+        self.portrait.clicked.connect(self.pet_requested.emit)
+        card_rows.addWidget(self.portrait)
+        names = QHBoxLayout()
+        self.pet_name = label(self.settings.get("name"), "petName")
+        self.pet_name.setMinimumWidth(0)
         names.addWidget(self.pet_name)
-        names.addWidget(label("Your pocket-sized partner in everyday life.", "subtitle"))
-        name_row.addLayout(names)
-        name_row.addStretch()
-        self.state = label("●  Feeling cozy", "pill")
-        name_row.addWidget(self.state, alignment=Qt.AlignVCenter)
-        layout.addLayout(name_row)
-        actions = QHBoxLayout()
-        actions.addWidget(button("♡  Give a little love", self.pet_requested.emit, True), 1)
-        actions.addWidget(button("↗  Bring me back", self.summon_requested.emit), 1)
-        layout.addLayout(actions)
-        layout.addWidget(label("WHAT SHALL WE DO?", "section"))
-        activity_row = QHBoxLayout()
-        activity_row.setSpacing(5)
+        stamp = QLabel()
+        stamp.setPixmap(icon("paw", "#ebba86", 21).pixmap(21, 21))
+        names.addWidget(stamp)
+        names.addStretch()
+        card_rows.addLayout(names)
+        card_rows.addWidget(label("Tiny buddy for your day.", "petTagline"))
+        grid = QGridLayout()
+        grid.setSpacing(8)
         self.activity_buttons = {}
-        for activity in ACTIVITIES:
-            tile = ActivityButton(activity, sprites)
+        for index, activity in enumerate(ACTIVITIES):
+            tile = ActivityButton(activity, self.sprites)
             tile.clicked.connect(lambda checked=False, key=activity.key: self.activity_requested.emit(key))
-            activity_row.addWidget(tile, 1)
             self.activity_buttons[activity.key] = tile
+            if index == 4:
+                tile.setFixedWidth(158)
+                grid.addWidget(tile, 2, 0, 1, 2, Qt.AlignHCenter)
+            else:
+                grid.addWidget(tile, index // 2, index % 2)
         self.sleep_button = self.activity_buttons["nap"]
-        layout.addLayout(activity_row)
-        self.activity_hint = label("Choose a little adventure, or just keep me nearby.", "hint")
-        self.activity_hint.setWordWrap(True)
-        layout.addWidget(self.activity_hint)
-        card = QFrame()
-        card.setObjectName("card")
-        rows = QVBoxLayout(card)
-        rows.setContentsMargins(15, 12, 15, 12)
-        self.wander = QCheckBox("Explore my desktop")
+        card_rows.addLayout(grid)
+        rows.addWidget(card)
+        self.focus = button("◷  Focus together · 25 min", self.focus_requested.emit)
+        self.focus.setObjectName("focus")
+        self.focus.hide()
+        rows.addWidget(self.focus)
+        self.wander = ExploreButton()
         self.wander.setChecked(self.settings.get("wander"))
         self.wander.toggled.connect(self.wander_changed.emit)
         rows.addWidget(self.wander)
-        rows.addWidget(label("Gentle wandering, with respect for your screen edges.", "hint"))
-        row = QHBoxLayout()
-        self.focus = button("◷  Focus together · 25 min", self.focus_requested.emit)
-        row.addWidget(self.focus, 1)
+        utility = QHBoxLayout()
         self.rest_button = button("Rest here", lambda: self.activity_requested.emit("idle"))
-        row.addWidget(self.rest_button)
-        rows.addLayout(row)
-        layout.addWidget(card)
-        hint = label("Drag to move  ·  Click to pet  ·  Double-click to chat\nRight-click for more  ·  Find me in your system tray", "hint")
-        hint.setAlignment(Qt.AlignCenter)
-        layout.addWidget(hint)
-        layout.addStretch()
-        scroll.setWidget(page)
+        self.rest_button.setObjectName("quiet")
+        utility.addWidget(self.rest_button)
+        bring_back = button("Bring back ↗", self.summon_requested.emit)
+        bring_back.setObjectName("quiet")
+        utility.addWidget(bring_back)
+        rows.addLayout(utility)
+        self.state = label("●  Feeling cozy", "state")
+        self.state.setAlignment(Qt.AlignCenter)
+        rows.addWidget(self.state)
+        rows.addStretch()
+        scroll.setWidget(content)
         return scroll
 
-    def chat_tab(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(0, 18, 0, 8)
-        layout.setSpacing(12)
-        self.chat_info = label("A cozy place to pause. Offline replies stay on this device.", "hint")
+    def build_chat(self):
+        frame = QFrame()
+        frame.setObjectName("chatPanel")
+        rows = QVBoxLayout(frame)
+        rows.setContentsMargins(16, 18, 16, 16)
+        rows.setSpacing(12)
+        heading = QHBoxLayout()
+        chat_icon = QLabel()
+        chat_icon.setPixmap(icon("chat", "#ba702f", 27).pixmap(27, 27))
+        heading.addWidget(chat_icon)
+        heading.addWidget(label("Chat", "chatTitle"))
+        heading.addStretch()
+        self.clear_button = QToolButton()
+        self.clear_button.setIcon(icon("clear", "#bca28b", 19))
+        self.clear_button.setAccessibleName("Clear conversation")
+        self.clear_button.setToolTip("Clear conversation")
+        self.clear_button.clicked.connect(self.clear_chat)
+        heading.addWidget(self.clear_button)
+        rows.addLayout(heading)
+        divider = QFrame()
+        divider.setFixedHeight(2)
+        divider.setStyleSheet("background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #c68c59,stop:.24 #c68c59,stop:.241 #f1e8de,stop:1 #f1e8de); border: 0;")
+        rows.addWidget(divider)
+        self.chat_info = label("", "hint")
         self.chat_info.setWordWrap(True)
-        layout.addWidget(self.chat_info)
-        self.transcript = QTextBrowser()
-        self.transcript.setOpenExternalLinks(False)
-        self.transcript.setOpenLinks(False)
-        self.transcript.setStyleSheet("QTextBrowser { padding: 12px; }")
-        layout.addWidget(self.transcript, 1)
-        self.add_message(self.settings.get("name"), "Hey, friend. I’m happy you’re here. What’s on your mind?", False)
+        rows.addWidget(self.chat_info)
+        self.conversation_frame = ConversationFrame()
+        history_rows = QVBoxLayout(self.conversation_frame)
+        history_rows.setContentsMargins(2, 2, 2, 2)
+        self.transcript = ChatHistory(self.sprites)
+        history_rows.addWidget(self.transcript)
+        rows.addWidget(self.conversation_frame, 1)
+        self.add_message(self.settings.get("name"), "Hi! I’m here.")
         self.thinking = label("", "hint")
-        layout.addWidget(self.thinking)
-        row = QHBoxLayout()
+        self.thinking.hide()
+        rows.addWidget(self.thinking)
+        composer_row = QHBoxLayout()
+        composer_row.setSpacing(10)
+        composer = QFrame()
+        composer.setObjectName("composer")
+        composer.setMinimumHeight(52)
+        composer_layout = QHBoxLayout(composer)
+        composer_layout.setContentsMargins(10, 3, 10, 3)
         self.input = QLineEdit()
         self.input.setPlaceholderText("Say something to your companion…")
+        self.input.setAccessibleName("Message to Biscuit")
         self.input.setMaxLength(4000)
         self.input.returnPressed.connect(self.send)
-        row.addWidget(self.input, 1)
+        composer_layout.addWidget(self.input, 1)
+        stamp = QLabel()
+        stamp.setPixmap(icon("paw", "#e2ab6e", 22).pixmap(22, 22))
+        stamp.setAttribute(Qt.WA_TransparentForMouseEvents)
+        composer_layout.addWidget(stamp)
+        composer_row.addWidget(composer, 1)
         self.send_button = button("Send ↗", self.send, True)
-        row.addWidget(self.send_button)
-        layout.addLayout(row)
-        clear = button("Clear conversation", self.clear_chat)
-        clear.setObjectName("quiet")
-        layout.addWidget(clear, alignment=Qt.AlignLeft)
-        return page
+        self.send_button.setFixedSize(92, 52)
+        composer_row.addWidget(self.send_button)
+        rows.addLayout(composer_row)
+        return frame
 
-    def settings_tab(self):
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(0, 18, 8, 8)
-        layout.setSpacing(12)
-        layout.addWidget(label("MAKE YOURSELF AT HOME", "section"))
-        form = QFormLayout()
-        form.setSpacing(10)
-        self.name = QLineEdit(self.settings.get("name"))
-        self.name.setMaxLength(30)
-        form.addRow("Pet’s name", self.name)
-        self.size_label = label(f"{self.settings.get('scale')}%")
-        slider_row = QHBoxLayout()
-        self.scale = QSlider(Qt.Horizontal)
-        self.scale.setRange(60, 150)
-        self.scale.setValue(self.settings.get("scale"))
-        self.scale.valueChanged.connect(lambda n: self.size_label.setText(f"{n}%"))
-        self.scale.valueChanged.connect(self.scale_changed.emit)
-        slider_row.addWidget(self.scale)
-        slider_row.addWidget(self.size_label)
-        form.addRow("Pet size", slider_row)
-        layout.addLayout(form)
-        self.reminders = QCheckBox("Gentle stretch reminders every 25 minutes")
-        self.reminders.setChecked(self.settings.get("reminders"))
-        layout.addWidget(self.reminders)
-        self.startup = QCheckBox("Meet me when Windows starts")
-        self.startup.setChecked(startup_enabled())
-        self.startup.setEnabled(sys.platform == "win32")
-        layout.addWidget(self.startup)
-        layout.addSpacing(10)
-        layout.addWidget(label("OPTIONAL AI CONNECTION", "section"))
-        note = label("Offline mode is always available. With AI enabled, your messages and recent conversation are sent to the provider you choose. No screen capture, files, or desktop control.", "hint")
-        note.setWordWrap(True)
-        layout.addWidget(note)
-        self.provider = QCheckBox("Use an OpenAI-compatible AI provider")
-        self.provider.setChecked(self.settings.get("provider"))
-        layout.addWidget(self.provider)
-        ai_form = QFormLayout()
-        ai_form.setSpacing(10)
-        self.endpoint = QLineEdit(self.settings.get("endpoint"))
-        self.endpoint.setPlaceholderText("https://api.openai.com/v1")
-        self.model = QLineEdit(self.settings.get("model"))
-        self.key = QLineEdit()
-        self.key.setEchoMode(QLineEdit.Password)
-        self.key.setPlaceholderText("API key (optional for local providers)")
-        self.key.setText(self.companion.key)
-        ai_form.addRow("API base URL", self.endpoint)
-        ai_form.addRow("Model", self.model)
-        ai_form.addRow("API key", self.key)
-        layout.addLayout(ai_form)
-        self.remember = QCheckBox("Remember key in the operating system’s credential store")
-        self.remember.setChecked(bool(self.companion.key))
-        layout.addWidget(self.remember)
-        key_note = label("Keys are never written to the preferences file. Uncheck to remove a saved key. Provider fees may apply.", "hint")
-        key_note.setWordWrap(True)
-        layout.addWidget(key_note)
-        layout.addWidget(button("Save preferences", self.save, True))
-        self.saved = label("", "hint")
-        self.saved.setWordWrap(True)
-        layout.addWidget(self.saved)
-        layout.addStretch()
-        scroll.setWidget(page)
-        return scroll
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "sidebar"):
+            self.sidebar.setFixedWidth(max(248, min(326, round((self.width() - 74) * .33))))
+
+    def open_preferences(self):
+        self.preferences.showNormal()
+        self.preferences.raise_()
+        self.preferences.activateWindow()
+
+    def on_preferences_saved(self):
+        self.pet_name.setText(self.settings.get("name"))
+        self.refresh_mode()
+        self.preferences_saved.emit()
 
     def refresh_mode(self):
         ai = self.settings.get("provider")
         self.mode.setText("●  AI enabled" if ai else "●  Offline")
-        self.chat_info.setText("AI enabled · Messages are sent to your configured provider." if ai else "Offline companion · Cozy preset replies, entirely on your device.")
+        self.mode.setToolTip("Chat uses your configured AI provider" if ai else "Offline companion replies stay on this device")
+        self.chat_info.setText("AI enabled · Messages are sent to your chosen provider." if ai else "A cozy place to pause. Offline replies stay on this device.")
 
     def set_state(self, state):
         titles = {"sleeping": "Dreaming", "walking": "On a stroll", "happy": "Feeling loved", "dragged": "Wheee!", "idle": "Feeling cozy", "entering": "Hello there", "leaving": "See you soon", "working": "Working together", "greeting": "Hello, friend!", "exploring": "Looking around", "following": "Right behind you"}
@@ -385,17 +454,20 @@ class ControlPanel(QWidget):
         for activity, tile in self.activity_buttons.items():
             tile.setChecked(activity == key)
         self.portrait.set_activity(key)
-        self.activity_hint.setText(BY_KEY[key].description if key in BY_KEY else "Resting right here. Choose an activity whenever you like.")
-        self.sleep_button.setText("Wake up" if key == "nap" else "Take a nap")
-        self.sleep_button.setAccessibleName(self.sleep_button.text())
+        self.sleep_button.setText("Wake" if key == "nap" else "Nap")
+        self.sleep_button.setAccessibleName("Wake up" if key == "nap" else "Take a nap")
+
+    def set_focus_remaining(self, seconds):
+        self.focus.setVisible(seconds is not None)
+        if seconds is not None:
+            self.focus.setText(f"◷  {seconds // 60:02d}:{seconds % 60:02d} · Stop")
+            self.activity_buttons["work"].setText(f"{seconds // 60:02d}:{seconds % 60:02d}")
+        else:
+            self.focus.setText("◷  Focus together · 25 min")
+            self.activity_buttons["work"].setText("Work")
 
     def add_message(self, who, message, mine=False, error=False):
-        color = "#a76248" if mine else "#6c815b"
-        if error:
-            color = "#b05245"
-        escaped = html.escape(message).replace("\n", "<br>")
-        self.transcript.append(f'<p style="margin-top:16px; color:{color}; font-size:11px;"><b>{html.escape(who)}</b></p><p style="color:#514335; line-height:150%; margin-bottom:14px;">{escaped}</p>')
-        self.transcript.verticalScrollBar().setValue(self.transcript.verticalScrollBar().maximum())
+        self.transcript.add_message(who, message, mine, error)
 
     def send(self):
         message = self.input.text().strip()
@@ -408,40 +480,25 @@ class ControlPanel(QWidget):
         self.send_button.setEnabled(not busy)
         self.input.setEnabled(not busy)
         self.thinking.setText("A tiny thought is on its way…" if busy else "")
+        self.thinking.setVisible(busy)
+        if not busy and self.isActiveWindow() and not self.preferences.isVisible():
+            self.input.setFocus()
 
     def clear_chat(self):
         self.clear_requested.emit()
         self.transcript.clear()
         self.add_message(self.settings.get("name"), "A fresh little start. I’m here.")
 
-    def save(self):
-        try:
-            if not self.model.text().strip() or not self.endpoint.text().strip():
-                raise ValueError("Please enter an API base URL and model, even if you keep AI disabled for now.")
-            if sys.platform == "win32" and self.startup.isChecked() != startup_enabled():
-                set_startup(self.startup.isChecked())
-            self.settings.update(name=self.name.text().strip() or "Biscuit", reminders=self.reminders.isChecked(),
-                                 provider=self.provider.isChecked(), endpoint=self.endpoint.text().strip(),
-                                 model=self.model.text().strip(), scale=self.scale.value())
-            self.companion.clear()
-            self.companion.save_key(self.key.text(), self.remember.isChecked())
-            self.saved.setText("Preferences saved. Make yourself comfortable.")
-        except (OSError, RuntimeError, ValueError) as exc:
-            self.saved.setText(str(exc))
-        self.pet_name.setText(self.settings.get("name"))
-        self.refresh_mode()
-        self.preferences_saved.emit()
-
     def open(self, chat=False):
-        if chat:
-            self.tabs.setCurrentIndex(1)
         self.showNormal()
         self.raise_()
         self.activateWindow()
         if chat:
             self.input.setFocus()
+            QTimer.singleShot(0, self.input.setFocus)
 
     def closeEvent(self, event):
+        self.preferences.hide()
         if self.allow_close:
             event.accept()
             return
