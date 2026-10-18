@@ -82,6 +82,8 @@ def test_secondary_walk_motion_repeats_with_sprite_loop():
     a, b = Animator(walk_fps=8, walk_frames=4), Animator(walk_fps=8, walk_frames=4)
     a.set_state("walking")
     b.set_state("walking")
+    a.advance(1)
+    b.advance(1)
     first, second = a.advance(.07), b.advance(.57)
     assert first.bob == pytest.approx(second.bob)
     assert first.rotation == pytest.approx(second.rotation)

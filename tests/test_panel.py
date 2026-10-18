@@ -2,7 +2,7 @@ import pytest
 from PySide6.QtCore import Qt, QPoint
 from PySide6.QtGui import QFontInfo
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QScrollArea, QTabWidget
+from PySide6.QtWidgets import QAbstractButton, QScrollArea, QTabWidget
 from desktop_pet.app import Application
 from desktop_pet.chat_widgets import BubbleText
 from desktop_pet.storage import Settings
@@ -29,6 +29,7 @@ def controller(app, tmp_path):
 
 def test_companion_and_chat_are_visible_together_and_enter_sends(controller):
     panel = controller.panel
+    panel.resize(1040, 900)
     QTest.qWait(20)
     assert panel.sidebar.isVisible() and panel.chat_panel.isVisible()
     assert panel.sidebar.mapTo(panel, QPoint()).x() < panel.chat_panel.mapTo(panel, QPoint()).x()
@@ -78,6 +79,9 @@ def test_preferences_save_updates_name_badge_and_size_without_plaintext_key(cont
     assert settings.get("name") == "Crumble"
     assert panel.pet_name.text() == "Crumble"
     assert settings.get("reminders") is True
+    assert settings.get("provider") is False
+    assert saved_keys == []
+    QTest.mouseClick(preferences.ai_save_button, Qt.LeftButton)
     assert settings.get("provider") is True
     assert panel.mode.text() == "●  AI enabled"
     assert saved_keys == [("test-session-key", False)]
@@ -89,8 +93,9 @@ def test_invalid_preferences_remain_open_with_explanation(controller):
     preferences = controller.panel.preferences
     controller.panel.open_preferences()
     preferences.model.clear()
-    QTest.mouseClick(preferences.save_button, Qt.LeftButton)
-    assert "base URL and model" in preferences.status.text()
+    preferences.provider.setChecked(True)
+    QTest.mouseClick(preferences.ai_save_button, Qt.LeftButton)
+    assert "base URL and model" in preferences.ai_status.text()
     assert controller.settings.get("model") == "gpt-4o-mini"
     assert preferences.isVisible()
 
@@ -163,6 +168,107 @@ def test_work_countdown_is_visible_on_its_activity_card(controller):
     controller.activate_activity("nap")
     assert panel.activity_buttons["work"].text() == "Work"
     assert panel.focus.isHidden()
+
+
+def test_only_explore_tile_controls_roaming_and_stays_in_sync_with_tray(controller):
+    panel = controller.panel
+    explore = panel.activity_buttons["explore"]
+    assert [widget for widget in panel.findChildren(QAbstractButton)
+            if "Explore" in widget.text()] == [explore]
+    QTest.mouseClick(explore, Qt.LeftButton)
+    assert controller.pet.activity == "explore"
+    assert controller.settings.get("wander") and controller.wander.isChecked()
+    controller.wander.trigger()
+    assert controller.pet.activity == "idle" and not explore.isChecked()
+    QTest.mouseClick(explore, Qt.LeftButton)
+    QTest.mouseClick(explore, Qt.LeftButton)
+    assert not controller.settings.get("wander")
+
+
+def test_compact_layout_fits_and_restores_wide_layout_without_losing_chat(controller):
+    panel = controller.panel
+    panel.add_message("You", "Keep this conversation", mine=True)
+    controller.activate_activity("work")
+    controller.settings.update(provider=True)
+    panel.refresh_mode()
+    panel.set_busy(True)
+    for width, height in ((480, 540), (640, 600), (799, 620), (1040, 900), (480, 540)):
+        panel.resize(width, height)
+        QTest.qWait(30)
+        assert (panel.width(), panel.height()) == (width, height)
+        compact = width < 800
+        assert panel.compact is compact
+        assert panel.portrait.isVisible() is not compact
+        assert panel.sidebar.horizontalScrollBar().maximum() == 0
+        for widget in (panel.settings_button, panel.input, panel.send_button,
+                       *panel.activity_buttons.values()):
+            assert widget.isVisible()
+            origin = widget.mapTo(panel, QPoint())
+            assert 0 <= origin.x() <= panel.width() - widget.width()
+            assert 0 <= origin.y() <= panel.height() - widget.height()
+        if compact:
+            assert panel.sidebar.verticalScrollBar().maximum() == 0
+            assert panel.sidebar.y() < panel.chat_panel.y()
+        else:
+            assert panel.sidebar.x() < panel.chat_panel.x()
+        assert panel.activity_buttons["work"].isChecked()
+        assert "Keep this conversation" in panel.transcript.toPlainText()
+    panel.set_busy(False)
+
+
+def test_general_preferences_ignore_ai_fields_and_keep_conversation(controller, monkeypatch):
+    panel, companion = controller.panel, controller.companion
+    history = [{"role": "assistant", "content": "Remember our conversation"}]
+    companion.history = history.copy()
+    panel.add_message("Biscuit", history[0]["content"])
+    cancelled, credentials = [], []
+    monkeypatch.setattr(companion, "cancel_pending", lambda: cancelled.append(True))
+    monkeypatch.setattr(companion, "save_key", lambda *args: credentials.append(args))
+    preferences = panel.preferences
+    preferences.provider.setChecked(True)
+    preferences.endpoint.clear()
+    preferences.model.clear()
+    preferences.name.setText("Muffin")
+    preferences.save()
+    assert controller.settings.get("name") == "Muffin"
+    assert controller.settings.get("provider") is False
+    assert "saved" in preferences.status.text().lower()
+    assert companion.history == history
+    assert history[0]["content"] in panel.transcript.toPlainText()
+    assert cancelled == credentials == []
+
+
+def test_disabled_ai_allows_empty_connection_and_saving_does_not_clear_chat(controller, monkeypatch):
+    panel, companion = controller.panel, controller.companion
+    history = [{"role": "assistant", "content": "Still here"}]
+    companion.history = history.copy()
+    panel.add_message("Biscuit", "Still here")
+    preferences = panel.preferences
+    preferences.endpoint.clear()
+    preferences.model.clear()
+    credentials = []
+    monkeypatch.setattr(companion, "save_key", lambda *args: credentials.append(args))
+    preferences.save_ai()
+    preferences.save_ai()
+    assert controller.settings.get("endpoint") == controller.settings.get("model") == ""
+    assert controller.settings.get("provider") is False
+    assert "saved" in preferences.ai_status.text().lower()
+    assert credentials == []
+    assert companion.history == history
+    assert "Still here" in panel.transcript.toPlainText()
+    QTest.mouseClick(panel.clear_button, Qt.LeftButton)
+    assert companion.history == []
+    assert "Still here" not in panel.transcript.toPlainText()
+
+
+def test_enter_in_ai_field_saves_connection_separately(controller):
+    preferences = controller.panel.preferences
+    controller.panel.open_preferences()
+    preferences.name.setText("Not saved yet")
+    preferences.model.setText("new-local-model")
+    QTest.keyClick(preferences.model, Qt.Key_Return)
+    assert controller.settings.get("model") == "new-local-model"
+    assert controller.settings.get("name") == "Biscuit"
 
 
 def test_bundled_fonts_load_without_network(controller):

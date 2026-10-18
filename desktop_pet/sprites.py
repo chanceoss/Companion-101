@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QBitmap, QPainter, QPixmap, QRegion
+from .animations import AnimationLibrary
 
 ASSETS = Path(__file__).resolve().parent / "assets"
 
@@ -11,11 +12,12 @@ class SpriteBank:
     def __init__(self, directory=ASSETS):
         self.directory = Path(directory).resolve()
         self.manifest = json.loads((self.directory / "sprites.json").read_text(encoding="utf-8"))
+        self.animation_library = AnimationLibrary(self.manifest)
         self.images = {}
         self.atlases = {}
         for name, spec in self.manifest.get("atlases", {}).items():
             self._load_atlas(name, spec)
-        self.states = self.manifest["states"]
+        self.states = self.animation_library.states
         for state in self.states.values():
             if not state["frames"] or not 0 < state["fps"] <= 60:
                 raise ValueError("Each sprite state needs frames and an fps between 0 and 60.")
@@ -106,7 +108,8 @@ class SpriteBank:
     def frame(self, state, elapsed, facing="front"):
         spec = self.spec(state)
         frames = spec.get("directions", {}).get(facing, spec["frames"])
-        frame = frames[int(max(0, elapsed) * spec["fps"]) % len(frames)]
+        state = state if state in self.states else "idle"
+        frame = frames[self.animation_library.frame_index(state, elapsed, len(frames))]
         return self.images[self._key(frame)]
 
     def eyes(self, state):

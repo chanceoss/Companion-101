@@ -1,46 +1,569 @@
 {
-  "canvas": [1312, 1199],
-  "eyes": [[0.321, 0.401, 0.109, 0.111], [0.585, 0.401, 0.109, 0.111]],
+  "canvas": [
+    1312,
+    1199
+  ],
+  "eyes": [
+    [
+      0.321,
+      0.401,
+      0.109,
+      0.111
+    ],
+    [
+      0.585,
+      0.401,
+      0.109,
+      0.111
+    ]
+  ],
   "atlases": {
-    "walk": {"file": "walk-cycle.png", "columns": 4, "rows": 3,
-             "row_edges": [0, 0.34, 0.637, 1]},
-    "activities": {"file": "activities.png", "columns": 5, "rows": 1,
-                   "column_edges": [0, 0.21869, 0.40585, 0.60244, 0.82021, 1]}
+    "walk": {
+      "file": "walk-cycle.png",
+      "columns": 4,
+      "rows": 3,
+      "row_edges": [
+        0,
+        0.34,
+        0.637,
+        1
+      ]
+    },
+    "activities": {
+      "file": "activities.png",
+      "columns": 5,
+      "rows": 1,
+      "column_edges": [
+        0,
+        0.21869,
+        0.40585,
+        0.60244,
+        0.82021,
+        1
+      ]
+    }
   },
   "states": {
-    "idle": {"frames": ["biscuit.png"], "fps": 8},
+    "idle": {
+      "frames": [
+        "biscuit.png"
+      ],
+      "fps": 8,
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 1.4,
+          "frequency": 0.3819718634205488,
+          "offset": 0
+        },
+        "rotation": {
+          "wave": "sine",
+          "amplitude": 0.6,
+          "frequency": 0.1909859317102744,
+          "offset": 0
+        },
+        "sx": {
+          "wave": "sine",
+          "amplitude": 0.004,
+          "frequency": 0.3819718634205488,
+          "offset": 1
+        },
+        "sy": {
+          "wave": "sine",
+          "amplitude": -0.006,
+          "frequency": 0.3819718634205488,
+          "offset": 1
+        }
+      }
+    },
     "walking": {
       "fps": 8,
       "eyes": [],
       "frames": [
-        {"atlas": "walk", "column": 0, "row": 0},
-        {"atlas": "walk", "column": 1, "row": 0},
-        {"atlas": "walk", "column": 2, "row": 0},
-        {"atlas": "walk", "column": 3, "row": 0}
+        {
+          "atlas": "walk",
+          "column": 0,
+          "row": 0
+        },
+        {
+          "atlas": "walk",
+          "column": 1,
+          "row": 0
+        },
+        {
+          "atlas": "walk",
+          "column": 2,
+          "row": 0
+        },
+        {
+          "atlas": "walk",
+          "column": 3,
+          "row": 0
+        }
       ],
       "directions": {
         "side": [
-          {"atlas": "walk", "column": 0, "row": 1},
-          {"atlas": "walk", "column": 1, "row": 1},
-          {"atlas": "walk", "column": 2, "row": 1},
-          {"atlas": "walk", "column": 3, "row": 1}
+          {
+            "atlas": "walk",
+            "column": 0,
+            "row": 1
+          },
+          {
+            "atlas": "walk",
+            "column": 1,
+            "row": 1
+          },
+          {
+            "atlas": "walk",
+            "column": 2,
+            "row": 1
+          },
+          {
+            "atlas": "walk",
+            "column": 3,
+            "row": 1
+          }
         ],
         "back": [
-          {"atlas": "walk", "column": 0, "row": 2},
-          {"atlas": "walk", "column": 1, "row": 2},
-          {"atlas": "walk", "column": 2, "row": 2},
-          {"atlas": "walk", "column": 3, "row": 2}
+          {
+            "atlas": "walk",
+            "column": 0,
+            "row": 2
+          },
+          {
+            "atlas": "walk",
+            "column": 1,
+            "row": 2
+          },
+          {
+            "atlas": "walk",
+            "column": 2,
+            "row": 2
+          },
+          {
+            "atlas": "walk",
+            "column": 3,
+            "row": 2
+          }
         ]
+      },
+      "motion": {
+        "bob": {
+          "wave": "abs_sine",
+          "amplitude": -2,
+          "frequency": "cycle",
+          "offset": 0
+        },
+        "rotation": {
+          "wave": "sine",
+          "amplitude": 1.2,
+          "frequency": "cycle",
+          "offset": 0
+        },
+        "sx": {
+          "wave": "abs_sine",
+          "amplitude": 0.008,
+          "frequency": "cycle",
+          "offset": 1
+        },
+        "sy": {
+          "wave": "abs_sine",
+          "amplitude": -0.008,
+          "frequency": "cycle",
+          "offset": 1
+        }
+      },
+      "mirror_left": true
+    },
+    "happy": {
+      "frames": [
+        "biscuit.png"
+      ],
+      "fps": 12,
+      "playback": "once",
+      "duration": 1.5,
+      "next": "idle",
+      "motion": {
+        "bob": {
+          "wave": "abs_sine",
+          "amplitude": -16,
+          "frequency": 2.5464790894703255,
+          "offset": 0
+        },
+        "rotation": {
+          "wave": "sine",
+          "amplitude": 6,
+          "frequency": 2.5464790894703255,
+          "offset": 0
+        },
+        "sx": {
+          "wave": "sine",
+          "amplitude": 0.035,
+          "frequency": 2.5464790894703255,
+          "offset": 1
+        },
+        "sy": {
+          "wave": "sine",
+          "amplitude": -0.035,
+          "frequency": 2.5464790894703255,
+          "offset": 1
+        }
       }
     },
-    "happy": {"frames": ["biscuit.png"], "fps": 12},
-    "exploring": {"frames": [{"atlas": "activities", "column": 0, "row": 0}], "fps": 8, "eyes": []},
-    "working": {"frames": [{"atlas": "activities", "column": 1, "row": 0}], "fps": 8, "eyes": []},
-    "greeting": {"frames": [{"atlas": "activities", "column": 2, "row": 0}], "fps": 8, "eyes": []},
-    "sleeping": {"frames": [{"atlas": "activities", "column": 3, "row": 0}], "fps": 6, "eyes": []},
-    "following": {"frames": [{"atlas": "activities", "column": 4, "row": 0}], "fps": 8, "eyes": []},
-    "dragged": {"frames": ["biscuit.png"], "fps": 8},
-    "entering": {"frames": ["biscuit.png"], "fps": 12},
-    "leaving": {"frames": ["biscuit.png"], "fps": 12}
+    "exploring": {
+      "frames": [
+        {
+          "atlas": "activities",
+          "column": 0,
+          "row": 0
+        }
+      ],
+      "fps": 8,
+      "eyes": [],
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 1.2,
+          "frequency": 0.3183098861837907,
+          "offset": 0
+        },
+        "rotation": {
+          "wave": "sine",
+          "amplitude": 0.8,
+          "frequency": 0.15915494309189535,
+          "offset": 0
+        }
+      }
+    },
+    "working": {
+      "frames": [
+        {
+          "atlas": "activities",
+          "column": 1,
+          "row": 0
+        }
+      ],
+      "fps": 8,
+      "eyes": [],
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 0.65,
+          "frequency": 0.7957747154594768,
+          "offset": 0
+        },
+        "sy": {
+          "wave": "sine",
+          "amplitude": 0.003,
+          "frequency": 0.3183098861837907,
+          "offset": 1
+        }
+      }
+    },
+    "greeting": {
+      "frames": [
+        {
+          "atlas": "activities",
+          "column": 2,
+          "row": 0
+        }
+      ],
+      "fps": 8,
+      "eyes": [],
+      "playback": "once",
+      "duration": 4,
+      "motion": {
+        "bob": {
+          "wave": "abs_sine",
+          "amplitude": -4,
+          "frequency": 1.432394487827058,
+          "offset": 0
+        },
+        "rotation": {
+          "wave": "sine",
+          "amplitude": 2.5,
+          "frequency": 1.432394487827058,
+          "offset": 0
+        },
+        "sx": {
+          "wave": "sine",
+          "amplitude": 0.008,
+          "frequency": 1.432394487827058,
+          "offset": 1
+        },
+        "sy": {
+          "wave": "sine",
+          "amplitude": -0.008,
+          "frequency": 1.432394487827058,
+          "offset": 1
+        }
+      }
+    },
+    "sleeping": {
+      "frames": [
+        {
+          "atlas": "activities",
+          "column": 3,
+          "row": 0
+        }
+      ],
+      "fps": 6,
+      "eyes": [],
+      "blink": "closed",
+      "motion": {
+        "bob": 1,
+        "sx": {
+          "wave": "sine",
+          "amplitude": 0.007,
+          "frequency": 0.2705634032562221,
+          "offset": 1
+        },
+        "sy": {
+          "wave": "sine",
+          "amplitude": 0.014,
+          "frequency": 0.2705634032562221,
+          "offset": 1
+        }
+      }
+    },
+    "following": {
+      "frames": [
+        {
+          "atlas": "activities",
+          "column": 4,
+          "row": 0
+        }
+      ],
+      "fps": 8,
+      "eyes": [],
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 1.2,
+          "frequency": 0.3183098861837907,
+          "offset": 0
+        },
+        "rotation": {
+          "wave": "sine",
+          "amplitude": 0.8,
+          "frequency": 0.15915494309189535,
+          "offset": 0
+        }
+      }
+    },
+    "dragged": {
+      "frames": [
+        "biscuit.png"
+      ],
+      "fps": 8,
+      "motion": {
+        "rotation": {
+          "wave": "sine",
+          "amplitude": 9,
+          "frequency": 1.432394487827058,
+          "offset": 0
+        },
+        "sx": 0.95,
+        "sy": 1.05
+      }
+    },
+    "entering": {
+      "frames": [
+        "biscuit.png"
+      ],
+      "fps": 12,
+      "playback": "once",
+      "duration": 0.65,
+      "transition": {
+        "duration": 0
+      },
+      "motion": {
+        "opacity": {
+          "wave": "progress",
+          "from": 0,
+          "to": 1
+        },
+        "bob": {
+          "wave": "progress",
+          "from": 80,
+          "to": 0
+        },
+        "rotation": {
+          "wave": "progress",
+          "from": -12,
+          "to": 0
+        },
+        "sx": {
+          "wave": "progress",
+          "from": 0.75,
+          "to": 1.0
+        },
+        "sy": {
+          "wave": "progress",
+          "from": 0.75,
+          "to": 1.0
+        }
+      },
+      "next": "idle"
+    },
+    "leaving": {
+      "frames": [
+        "biscuit.png"
+      ],
+      "fps": 12,
+      "playback": "once",
+      "duration": 0.6,
+      "transition": {
+        "duration": 0
+      },
+      "motion": {
+        "opacity": {
+          "wave": "progress",
+          "from": 1,
+          "to": 0
+        },
+        "bob": {
+          "wave": "progress",
+          "from": 0,
+          "to": 80
+        },
+        "rotation": {
+          "wave": "progress",
+          "from": 0,
+          "to": -12
+        },
+        "sx": {
+          "wave": "progress",
+          "from": 1.0,
+          "to": 0.75
+        },
+        "sy": {
+          "wave": "progress",
+          "from": 1.0,
+          "to": 0.75
+        }
+      }
+    },
+    "idle_look": {
+      "frames": [
+        "biscuit.png"
+      ],
+      "fps": 8,
+      "playback": "once",
+      "duration": 1.8,
+      "next": "idle",
+      "motion": {
+        "rotation": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              0
+            ],
+            [
+              0.3,
+              -4
+            ],
+            [
+              0.7,
+              4
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "easing": "smoothstep"
+        },
+        "bob": {
+          "wave": "sine",
+          "amplitude": 1,
+          "frequency": 0.4,
+          "offset": 0
+        }
+      }
+    },
+    "idle_stretch": {
+      "frames": [
+        "biscuit.png"
+      ],
+      "fps": 8,
+      "playback": "once",
+      "duration": 1.6,
+      "next": "idle",
+      "blink": "closed",
+      "motion": {
+        "sy": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              1
+            ],
+            [
+              0.4,
+              1.05
+            ],
+            [
+              0.7,
+              0.97
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "easing": "smoothstep"
+        },
+        "sx": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              1
+            ],
+            [
+              0.4,
+              0.97
+            ],
+            [
+              0.7,
+              1.02
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "easing": "smoothstep"
+        }
+      }
+    }
+  },
+  "transitions": {
+    "duration": 0.16,
+    "easing": "smoothstep"
+  },
+  "blink": {
+    "interval": [
+      2.5,
+      6
+    ],
+    "duration": 0.16
+  },
+  "idle_behavior": {
+    "base": "idle",
+    "interval": [
+      7,
+      14
+    ],
+    "variants": [
+      "idle_look",
+      "idle_stretch"
+    ],
+    "weights": [
+      2,
+      1
+    ]
   }
 }

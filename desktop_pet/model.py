@@ -1,69 +1,7 @@
 """UI-independent animation and movement. All time values are seconds."""
 from dataclasses import dataclass
 import math
-import random
-
-
-@dataclass(frozen=True)
-class Pose:
-    bob: float = 0
-    rotation: float = 0
-    sx: float = 1
-    sy: float = 1
-    opacity: float = 1
-    blink: bool = False
-
-
-class Animator:
-    def __init__(self, walk_fps=8, walk_frames=4):
-        self.state = "entering"
-        self.elapsed = 0.0
-        self.clock = 0.0
-        self.blink_at = 2.8
-        self.rng = random.Random()
-        self.walk_fps = walk_fps
-        self.walk_frames = max(1, walk_frames)
-
-    def set_state(self, state):
-        if state != self.state:
-            self.state = state
-            self.elapsed = 0.0
-
-    def advance(self, dt):
-        self.elapsed += max(0, dt)
-        self.clock += max(0, dt)
-        if self.clock > self.blink_at + .16:
-            self.blink_at = self.clock + self.rng.uniform(2.5, 6)
-        if self.state in ("entering", "happy") and self.elapsed > (0.65 if self.state == "entering" else 1.5):
-            self.set_state("idle")
-        t = self.elapsed
-        blink = self.blink_at <= self.clock <= self.blink_at + .16
-        if self.state == "walking":
-            # Secondary motion follows the gait instead of rocking the whole body.
-            wave = math.sin(t * math.tau * self.walk_fps / self.walk_frames)
-            return Pose(-abs(wave) * 2, wave * 1.2, 1 + abs(wave) * .008, 1 - abs(wave) * .008, blink=blink)
-        if self.state == "happy":
-            wave = math.sin(t * 16)
-            return Pose(-abs(wave) * 16, wave * 6, 1 + wave * .035, 1 - wave * .035, blink=blink)
-        if self.state == "sleeping":
-            breath = math.sin(t * 1.7)
-            return Pose(1, 0, 1 + breath * .007, 1 + breath * .014, blink=True)
-        if self.state == "working":
-            return Pose(math.sin(t * 5) * .65, 0, 1, 1 + math.sin(t * 2) * .003)
-        if self.state == "greeting":
-            wave = math.sin(t * 9)
-            return Pose(-abs(wave) * 4, wave * 2.5, 1 + wave * .008, 1 - wave * .008)
-        if self.state in ("exploring", "following"):
-            return Pose(math.sin(t * 2) * 1.2, math.sin(t) * .8)
-        if self.state == "dragged":
-            return Pose(0, math.sin(t * 9) * 9, .95, 1.05, blink=blink)
-        if self.state in ("entering", "leaving"):
-            f = min(1, t / .6)
-            if self.state == "leaving":
-                f = 1 - f
-            return Pose((1 - f) * 80, (1 - f) * -12, .75 + .25 * f, .75 + .25 * f, f, blink)
-        breath = math.sin(t * 2.4)
-        return Pose(breath * 1.4, math.sin(t * 1.2) * .6, 1 + breath * .004, 1 - breath * .006, blink=blink)
+from .animations import Animator, Pose
 
 
 def clamp_position(x, y, left, top, right, bottom, width, height):

@@ -6,6 +6,19 @@ from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkRe
 from .model import offline_reply
 
 
+def validate_endpoint(base):
+    try:
+        parsed = urlparse(base.strip())
+        if parsed.scheme != "https" and not (parsed.scheme == "http" and parsed.hostname in ("localhost", "127.0.0.1", "::1")):
+            raise ValueError("Use an HTTPS API address, or HTTP for a local model on localhost.")
+        if (not parsed.hostname or any(c.isspace() for c in parsed.hostname)
+                or parsed.username or parsed.password or parsed.query or parsed.fragment):
+            raise ValueError("Enter a base API URL without credentials, query parameters, or fragments.")
+        _ = parsed.port
+    except ValueError as exc:
+        raise ValueError(str(exc)) from None
+
+
 class Companion(QObject):
     answered = Signal(str)
     failed = Signal(str)
@@ -16,6 +29,7 @@ class Companion(QObject):
         self.settings = settings
         self.network = QNetworkAccessManager(self)
         self.key = ""
+        self.remember_key = False
         self.history = []
         self.reply = None
         self.pending = ""
@@ -24,15 +38,18 @@ class Companion(QObject):
         try:
             import keyring
             self.key = keyring.get_password("BiscuitCompanion", "api-key") or ""
+            self.remember_key = bool(self.key)
         except Exception:
             self.key = ""
 
     def save_key(self, key, remember):
         self.key = key.strip()
+        self.remember_key = False
         try:
             import keyring
             if remember and self.key:
                 keyring.set_password("BiscuitCompanion", "api-key", self.key)
+                self.remember_key = True
             else:
                 try:
                     keyring.delete_password("BiscuitCompanion", "api-key")
@@ -49,12 +66,10 @@ class Companion(QObject):
             self.answered.emit(offline_reply(message, self.settings.get("name")))
             return
         base = self.settings.get("endpoint").strip().rstrip("/")
-        parsed = urlparse(base)
-        if parsed.scheme != "https" and not (parsed.scheme == "http" and parsed.hostname in ("localhost", "127.0.0.1", "::1")):
-            self.failed.emit("Use an HTTPS API address, or HTTP for a local model on localhost.")
-            return
-        if not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
-            self.failed.emit("Enter a base API URL without credentials, query parameters, or fragments.")
+        try:
+            validate_endpoint(base)
+        except ValueError as exc:
+            self.failed.emit(str(exc))
             return
         request = QNetworkRequest(QUrl(base + "/chat/completions"))
         request.setHeader(QNetworkRequest.ContentTypeHeader, "application/json")
@@ -97,8 +112,8 @@ class Companion(QObject):
             reply.deleteLater()
             self.busy_changed.emit(False)
 
-    def clear(self):
-        # A cleared conversation must not reappear when an in-flight reply arrives.
+    def cancel_pending(self):
+        """Cancel transport without discarding the completed conversation."""
         if self.reply is not None:
             reply, self.reply = self.reply, None
             reply.finished.disconnect(self._finished)
@@ -106,6 +121,10 @@ class Companion(QObject):
             reply.deleteLater()
             self.busy_changed.emit(False)
         self.pending = ""
+
+    def clear(self):
+        # A cleared conversation must not reappear when an in-flight reply arrives.
+        self.cancel_pending()
         self.history.clear()
 
     def shutdown(self):

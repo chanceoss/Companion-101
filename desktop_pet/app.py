@@ -62,7 +62,6 @@ class Application:
         self.panel.summon_requested.connect(self.summon)
         self.panel.pet_requested.connect(self.show_love)
         self.panel.sleep_requested.connect(self.toggle_sleep)
-        self.panel.wander_changed.connect(self.set_wander)
         self.panel.scale_changed.connect(self.set_scale)
         self.panel.message_sent.connect(self.companion.send)
         self.panel.clear_requested.connect(self.companion.clear)
@@ -128,9 +127,6 @@ class Application:
         self.wander.blockSignals(True)
         self.wander.setChecked(enabled)
         self.wander.blockSignals(False)
-        self.panel.wander.blockSignals(True)
-        self.panel.wander.setChecked(enabled)
-        self.panel.wander.blockSignals(False)
 
     def set_wander(self, enabled):
         if enabled:

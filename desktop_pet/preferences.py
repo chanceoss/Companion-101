@@ -1,10 +1,11 @@
 """The former Preferences tab, now opened by the compact gear button."""
 import sys
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QEvent
 from PySide6.QtWidgets import (QCheckBox, QDialog, QFormLayout, QHBoxLayout, QLabel,
                                QLineEdit, QPushButton, QScrollArea, QSlider,
                                QVBoxLayout, QWidget, QLayout)
 from .storage import startup_enabled, set_startup
+from .ai import validate_endpoint
 
 
 class PreferencesDialog(QDialog):
@@ -55,7 +56,7 @@ class PreferencesDialog(QDialog):
         scale_row.addWidget(self.size_label)
         form.addRow("Pet size", scale_row)
         layout.addLayout(form)
-        size_note = QLabel("Pet size updates immediately. Other changes use Save preferences.")
+        size_note = QLabel("Pet size updates immediately. Save companion preferences here; save the AI connection separately below.")
         size_note.setObjectName("hint")
         size_note.setWordWrap(True)
         layout.addWidget(size_note)
@@ -89,12 +90,25 @@ class PreferencesDialog(QDialog):
         ai_form.addRow("API key", self.key)
         layout.addLayout(ai_form)
         self.remember = QCheckBox("Remember key in the operating system’s credential store")
-        self.remember.setChecked(bool(companion.key))
+        self.remember.setChecked(companion.remember_key)
+        self._saved_key = companion.key
+        self._saved_remember = companion.remember_key
         layout.addWidget(self.remember)
         key_note = QLabel("Keys never go in the preferences file. Uncheck and save to remove a saved key. Provider fees may apply.")
         key_note.setObjectName("hint")
         key_note.setWordWrap(True)
         layout.addWidget(key_note)
+        self.ai_save_button = QPushButton("Save AI connection")
+        self.ai_save_button.setAutoDefault(False)
+        self.ai_save_button.clicked.connect(self.save_ai)
+        layout.addWidget(self.ai_save_button)
+        self.ai_status = QLabel("Completed conversation stays until you use Clear conversation.")
+        self.ai_status.setObjectName("hint")
+        self.ai_status.setWordWrap(True)
+        layout.addWidget(self.ai_status)
+        self.ai_fields = (self.endpoint, self.model, self.key)
+        for field in self.ai_fields:
+            field.installEventFilter(self)
         self.save_button = QPushButton("Save preferences")
         self.save_button.setObjectName("primary")
         self.save_button.setDefault(True)
@@ -122,16 +136,40 @@ class PreferencesDialog(QDialog):
 
     def save(self):
         try:
-            if not self.model.text().strip() or not self.endpoint.text().strip():
-                raise ValueError("Enter an API base URL and model, even if AI is disabled for now.")
             if sys.platform == "win32" and self.startup.isChecked() != startup_enabled():
                 set_startup(self.startup.isChecked())
             self.settings.update(name=self.name.text().strip() or "Biscuit", reminders=self.reminders.isChecked(),
-                                 provider=self.provider.isChecked(), endpoint=self.endpoint.text().strip(),
-                                 model=self.model.text().strip(), scale=self.scale.value())
-            self.companion.clear()
-            self.companion.save_key(self.key.text(), self.remember.isChecked())
+                                 scale=self.scale.value())
             self.status.setText("Preferences saved. Make yourself comfortable.")
         except (OSError, RuntimeError, ValueError) as exc:
             self.status.setText(str(exc))
         self.saved.emit()
+
+    def save_ai(self):
+        enabled = self.provider.isChecked()
+        endpoint, model = self.endpoint.text().strip().rstrip("/"), self.model.text().strip()
+        key, remember = self.key.text().strip(), self.remember.isChecked()
+        try:
+            if enabled:
+                if not endpoint or not model:
+                    raise ValueError("Enter an API base URL and model to enable AI.")
+            if endpoint:
+                validate_endpoint(endpoint)
+            changed = (enabled != self.settings.get("provider") or endpoint != self.settings.get("endpoint")
+                       or model != self.settings.get("model") or key != self._saved_key)
+            self.settings.update(provider=enabled, endpoint=endpoint, model=model)
+            if changed:
+                self.companion.cancel_pending()
+            if key != self._saved_key or remember != self._saved_remember:
+                self.companion.save_key(key, remember)
+            self._saved_key, self._saved_remember = key, remember
+            self.ai_status.setText("AI connection saved. Your completed conversation is unchanged.")
+        except (OSError, RuntimeError, ValueError) as exc:
+            self.ai_status.setText(str(exc))
+        self.saved.emit()
+
+    def eventFilter(self, source, event):
+        if source in self.ai_fields and event.type() == QEvent.KeyPress and event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            self.save_ai()
+            return True
+        return super().eventFilter(source, event)

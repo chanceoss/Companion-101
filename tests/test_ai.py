@@ -6,6 +6,7 @@ import pytest
 from PySide6.QtTest import QTest
 from desktop_pet.ai import Companion
 from desktop_pet.storage import Settings
+from desktop_pet.preferences import PreferencesDialog
 
 
 @pytest.fixture
@@ -126,3 +127,34 @@ def test_clear_cancels_inflight_conversation(app, tmp_path, provider):
     assert answers == []
     assert errors == []
     assert busy == [True, False]
+
+
+def test_connection_save_keeps_history_and_only_changed_connection_cancels_reply(app, tmp_path, provider):
+    endpoint, _, _ = provider
+    settings = Settings(tmp_path)
+    settings.update(provider=True, endpoint=endpoint)
+    companion = Companion(settings)
+    history = [{"role": "user", "content": "Previous question"},
+               {"role": "assistant", "content": "Previous answer"}]
+    companion.history = history.copy()
+    preferences = PreferencesDialog(settings, companion)
+    answers, busy = [], []
+    companion.answered.connect(answers.append)
+    companion.busy_changed.connect(busy.append)
+    try:
+        companion.send("Pending question")
+        original_reply = companion.reply
+        preferences.save()
+        preferences.save_ai()
+        assert companion.reply is original_reply
+        preferences.model.setText("different-model")
+        preferences.save_ai()
+        assert companion.reply is None
+        assert companion.pending == ""
+        assert companion.history == history
+        QTest.qWait(100)
+        assert answers == []
+        assert busy == [True, False]
+    finally:
+        companion.shutdown()
+        preferences.deleteLater()

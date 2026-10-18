@@ -1,14 +1,14 @@
 """Native companion sidebar + chat, with Preferences behind the small gear button."""
-import math
 from PySide6.QtCore import Qt, QRectF, QTimer, Signal, QSize
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QLinearGradient, QPen, QShortcut, QKeySequence
 from PySide6.QtWidgets import (QAbstractButton, QApplication, QFrame, QGridLayout,
     QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QSizePolicy,
-    QToolButton, QVBoxLayout, QWidget)
+    QToolButton, QVBoxLayout, QWidget, QBoxLayout)
 from .activities import ACTIVITIES, BY_KEY, SCENES
 from .chat_widgets import ChatHistory, ConversationFrame
 from .preferences import PreferencesDialog
 from .theme import garden, icon, load_fonts, paw, sparkle, ui_font
+from .animations import Animator
 
 STYLE = """
 QWidget {color: #674c3d; font-family: 'Nunito'; font-size: 15px;}
@@ -74,7 +74,11 @@ def button(text, callback, primary=False):
 
 
 class BrandHeader(QWidget):
+    compact = False
+
     def paintEvent(self, event):
+        if self.compact:
+            return
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         paw(p, 405, 26, 20, "#f4d6b2", 16)
@@ -85,6 +89,7 @@ class ActivityButton(QAbstractButton):
     def __init__(self, activity, sprites, parent=None):
         super().__init__(parent)
         self.activity = activity
+        self.compact = False
         self.sprite = sprites.frame(activity.scene, 0)
         self.setText({"work": "Work", "greet": "Hi", "nap": "Nap", "follow": "Follow"}.get(activity.key, "Explore"))
         self.setAccessibleName(activity.title)
@@ -96,7 +101,7 @@ class ActivityButton(QAbstractButton):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
     def sizeHint(self):
-        return QSize(128, 130)
+        return QSize(84, 90) if self.compact else QSize(128, 130)
 
     def enterEvent(self, event):
         self.update()
@@ -120,7 +125,7 @@ class ActivityButton(QAbstractButton):
         p.drawEllipse(QRectF(x + 2, 7, size - 4, size - 4))
         p.drawPixmap(QRectF(x, 3, size, size), self.sprite, QRectF(self.sprite.rect()))
         p.setPen(QColor("#a65e27" if selected else "#8d7463"))
-        p.setFont(ui_font(16, 700 if selected else 600))
+        p.setFont(ui_font(13 if self.compact else 16, 700 if selected else 600))
         p.drawText(QRectF(2, self.height() - 29, self.width() - 4, 25), Qt.AlignCenter, self.text())
 
 
@@ -148,7 +153,9 @@ class Portrait(QAbstractButton):
         self.setAccessibleName("Give Biscuit a little love")
         self.setToolTip("Click to give a little love")
         self.setFocusPolicy(Qt.StrongFocus)
-        self.t, self.activity = 0, "idle"
+        self.activity = "idle"
+        self.animator = Animator(library=sprites.animation_library)
+        self.pose = self.animator.advance(0)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.animate)
 
@@ -159,11 +166,12 @@ class Portrait(QAbstractButton):
         self.timer.stop()
 
     def animate(self):
-        self.t += .05
+        self.pose = self.animator.advance(.05)
         self.update()
 
     def set_activity(self, activity):
-        self.activity, self.t = activity, 0
+        self.activity = activity
+        self.animator.set_state(SCENES[activity])
         self.update()
 
     def paintEvent(self, event):
@@ -180,10 +188,17 @@ class Portrait(QAbstractButton):
         paw(p, self.width() - 32, 59, 19, "#edcd98", 10)
         p.setBrush(QColor(133, 132, 83, 22))
         p.drawEllipse(QRectF(self.width() / 2 - 68, self.height() - 18, 136, 11))
-        sprite = self.sprites.frame(SCENES[self.activity], self.t)
         w = min(self.width() - 8, 225)
-        h = w * sprite.height() / sprite.width()
-        p.drawPixmap(QRectF((self.width() - w) / 2, self.height() - h - 12 + math.sin(self.t * 2) * 1.4, w, h), sprite, QRectF(sprite.rect()))
+        p.save()
+        p.translate(self.width() / 2, self.height() - 12 + self.pose.bob * w / 255)
+        p.rotate(self.pose.rotation)
+        p.scale(self.pose.sx, self.pose.sy)
+        for state, elapsed, opacity in self.animator.layers():
+            sprite = self.sprites.frame(state, elapsed)
+            h = w * sprite.height() / sprite.width()
+            p.setOpacity(self.pose.opacity * opacity)
+            p.drawPixmap(QRectF(-w / 2, -h, w, h), sprite, QRectF(sprite.rect()))
+        p.restore()
         garden(p, QRectF(0, self.height() - 22, self.width(), 22), corner=True)
         if self.hasFocus():
             p.setBrush(Qt.NoBrush)
@@ -191,40 +206,10 @@ class Portrait(QAbstractButton):
             p.drawRoundedRect(QRectF(3, 3, self.width() - 6, self.height() - 6), 16, 16)
 
 
-class ExploreButton(QAbstractButton):
-    def __init__(self):
-        super().__init__()
-        self.setCheckable(True)
-        self.setFixedHeight(72)
-        self.setAccessibleName("Explore desktop")
-        self.setToolTip("Start exploring the desktop; click again to rest")
-        self.setCursor(Qt.PointingHandCursor)
-        self.setFocusPolicy(Qt.StrongFocus)
-
-    def paintEvent(self, event):
-        p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing)
-        p.setPen(QPen(QColor("#e9d7be" if self.isChecked() or self.hasFocus() else "#efe2d3"), 1))
-        p.setBrush(QColor("#fffcf7"))
-        p.drawRoundedRect(QRectF(1, 1, self.width() - 2, self.height() - 2), 18, 18)
-        p.setPen(Qt.NoPen)
-        p.setBrush(QColor("#fff0d4"))
-        p.drawRoundedRect(QRectF(14, 14, 44, 44), 13, 13)
-        paw(p, 25, 24, 23, "#c39465")
-        p.setPen(QColor("#614334"))
-        p.setFont(ui_font(15, 800))
-        p.drawText(QRectF(70, 15, self.width() - 98, 25), Qt.AlignVCenter, "Explore desktop")
-        p.setPen(QColor("#a48a73"))
-        p.setFont(ui_font(12))
-        p.drawText(QRectF(70, 39, self.width() - 90, 20), Qt.AlignVCenter, "Click to rest." if self.isChecked() else "Gentle stroll.")
-        icon("chevron", "#b29984", 18).paint(p, self.width() - 28, 27, 18, 18)
-
-
 class ControlPanel(QWidget):
     summon_requested = Signal()
     pet_requested = Signal()
     sleep_requested = Signal()
-    wander_changed = Signal(bool)
     scale_changed = Signal(int)
     message_sent = Signal(str)
     clear_requested = Signal()
@@ -240,7 +225,9 @@ class ControlPanel(QWidget):
         self.allow_close = False
         self.setObjectName("panel")
         self.setWindowTitle("Biscuit · A little company")
-        self.setMinimumSize(840, 680)
+        self.setMinimumSize(480, 540)
+        self.compact = None
+        self._updating_layout = False
         available = QApplication.primaryScreen().availableGeometry()
         self.resize(min(1100, available.width() - 64), min(960, available.height() - 64))
         self.setStyleSheet(STYLE)
@@ -248,7 +235,7 @@ class ControlPanel(QWidget):
         self.outer.setContentsMargins(28, 20, 28, 12)
         self.outer.setSpacing(20)
         self.outer.addWidget(self.build_header())
-        body = QHBoxLayout()
+        body = self.body = QHBoxLayout()
         body.setSpacing(18)
         self.sidebar = self.build_sidebar()
         self.sidebar.setFixedWidth(306)
@@ -256,7 +243,7 @@ class ControlPanel(QWidget):
         self.chat_panel = self.build_chat()
         body.addWidget(self.chat_panel, 1)
         self.outer.addLayout(body, 1)
-        footer = label("Drag Biscuit to move · Double-click the pet to chat · Right-click for more", "hint")
+        footer = self.footer = label("Drag Biscuit to move · Double-click the pet to chat · Right-click for more", "hint")
         footer.setAlignment(Qt.AlignCenter)
         self.outer.addWidget(footer)
         self.preferences = PreferencesDialog(settings, companion, self)
@@ -266,16 +253,20 @@ class ControlPanel(QWidget):
         self.preferences_shortcut = QShortcut(QKeySequence("Ctrl+,"), self)
         self.preferences_shortcut.activated.connect(self.open_preferences)
         self.refresh_mode()
+        self.apply_layout()
 
     def build_header(self):
-        header = BrandHeader()
+        header = self.brand_header = BrandHeader()
         row = QHBoxLayout(header)
         row.setContentsMargins(0, 0, 0, 0)
         titles = QVBoxLayout()
         titles.setSpacing(1)
-        titles.addWidget(label("COMPANION / 101", "eyebrow"))
-        titles.addWidget(label("A little company.", "title"))
-        titles.addWidget(label("Small paws. A brighter workday.", "subtitle"))
+        self.eyebrow = label("COMPANION / 101", "eyebrow")
+        self.brand_title = label("A little company.", "title")
+        self.subtitle = label("Small paws. A brighter workday.", "subtitle")
+        titles.addWidget(self.eyebrow)
+        titles.addWidget(self.brand_title)
+        titles.addWidget(self.subtitle)
         row.addLayout(titles)
         row.addStretch()
         status = QHBoxLayout()
@@ -307,17 +298,19 @@ class ControlPanel(QWidget):
         content.setObjectName("sidebarContents")
         content.setStyleSheet("QWidget#sidebarContents {background: transparent;}")
         content.setAutoFillBackground(False)
-        rows = QVBoxLayout(content)
+        rows = self.sidebar_rows = QVBoxLayout(content)
         rows.setContentsMargins(0, 0, 5, 0)
         rows.setSpacing(10)
         card = GardenCard()
-        card_rows = QVBoxLayout(card)
+        card_rows = self.card_rows = QVBoxLayout(card)
         card_rows.setContentsMargins(13, 7, 13, 18)
         card_rows.setSpacing(9)
         self.portrait = Portrait(self.sprites)
         self.portrait.clicked.connect(self.pet_requested.emit)
         card_rows.addWidget(self.portrait)
-        names = QHBoxLayout()
+        self.name_strip = QWidget()
+        names = QHBoxLayout(self.name_strip)
+        names.setContentsMargins(0, 0, 0, 0)
         self.pet_name = label(self.settings.get("name"), "petName")
         self.pet_name.setMinimumWidth(0)
         names.addWidget(self.pet_name)
@@ -325,9 +318,10 @@ class ControlPanel(QWidget):
         stamp.setPixmap(icon("paw", "#ebba86", 21).pixmap(21, 21))
         names.addWidget(stamp)
         names.addStretch()
-        card_rows.addLayout(names)
-        card_rows.addWidget(label("Tiny buddy for your day.", "petTagline"))
-        grid = QGridLayout()
+        card_rows.addWidget(self.name_strip)
+        self.tagline = label("Tiny buddy for your day.", "petTagline")
+        card_rows.addWidget(self.tagline)
+        grid = self.activity_grid = QGridLayout()
         grid.setSpacing(8)
         self.activity_buttons = {}
         for index, activity in enumerate(ACTIVITIES):
@@ -346,10 +340,6 @@ class ControlPanel(QWidget):
         self.focus.setObjectName("focus")
         self.focus.hide()
         rows.addWidget(self.focus)
-        self.wander = ExploreButton()
-        self.wander.setChecked(self.settings.get("wander"))
-        self.wander.toggled.connect(self.wander_changed.emit)
-        rows.addWidget(self.wander)
         utility = QHBoxLayout()
         self.rest_button = button("Rest here", lambda: self.activity_requested.emit("idle"))
         self.rest_button.setObjectName("quiet")
@@ -368,7 +358,7 @@ class ControlPanel(QWidget):
     def build_chat(self):
         frame = QFrame()
         frame.setObjectName("chatPanel")
-        rows = QVBoxLayout(frame)
+        rows = self.chat_rows = QVBoxLayout(frame)
         rows.setContentsMargins(16, 18, 16, 16)
         rows.setSpacing(12)
         heading = QHBoxLayout()
@@ -427,8 +417,68 @@ class ControlPanel(QWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        if hasattr(self, "sidebar"):
-            self.sidebar.setFixedWidth(max(248, min(326, round((self.width() - 74) * .33))))
+        if hasattr(self, "chat_info"):
+            self.apply_layout()
+
+    def apply_layout(self):
+        if self._updating_layout:
+            return
+        self._updating_layout = True
+        try:
+            compact = self.width() < 800
+            changed = compact != self.compact
+            self.compact = compact
+            self.brand_header.compact = compact
+            self.brand_header.update()
+            self.eyebrow.setVisible(not compact)
+            self.subtitle.setVisible(not compact)
+            self.footer.setVisible(not compact)
+            self.brand_title.setStyleSheet("font-size: 28px;" if compact else "")
+            self.mode.setStyleSheet("font-size: 13px; padding: 4px 10px; border-radius: 16px;" if compact else "")
+            self.mode.setFixedHeight(32 if compact else 38)
+            self.settings_button.setFixedSize(36 if compact else 46, 36 if compact else 46)
+            self.settings_button.setIconSize(QSize(23, 23) if compact else QSize(27, 27))
+            self.outer.setContentsMargins(*( (16, 12, 16, 12) if compact else (28, 20, 28, 12)))
+            self.outer.setSpacing(10 if compact else 20)
+            self.body.setDirection(QBoxLayout.TopToBottom if compact else QBoxLayout.LeftToRight)
+            self.body.setSpacing(10 if compact else 18)
+            self.portrait.setVisible(not compact)
+            self.tagline.setVisible(not compact)
+            self.state.setVisible(not compact)
+            self.pet_name.setStyleSheet("font-size: 20px;" if compact else "")
+            self.card_rows.setContentsMargins(*( (8, 4, 8, 6) if compact else (13, 7, 13, 18)))
+            self.card_rows.setSpacing(3 if compact else 9)
+            self.sidebar_rows.setSpacing(3 if compact else 10)
+            if changed:
+                for tile in self.activity_buttons.values():
+                    self.activity_grid.removeWidget(tile)
+                self.activity_grid.setSpacing(4 if compact else 8)
+                for index, tile in enumerate(self.activity_buttons.values()):
+                    tile.compact = compact
+                    tile.setMinimumSize(QSize(58, 86) if compact else QSize(92, 117))
+                    tile.setMaximumWidth(16777215)
+                    if compact:
+                        self.activity_grid.addWidget(tile, 0, index)
+                    elif index == 4:
+                        tile.setFixedWidth(158)
+                        self.activity_grid.addWidget(tile, 2, 0, 1, 2, Qt.AlignHCenter)
+                    else:
+                        self.activity_grid.addWidget(tile, index // 2, index % 2)
+                    tile.updateGeometry()
+                    tile.update()
+            self.chat_rows.setContentsMargins(*( (12, 12, 12, 12) if compact else (16, 18, 16, 16)))
+            self.chat_rows.setSpacing(8 if compact else 12)
+            self.chat_info.setVisible(not compact or self.settings.get("provider"))
+            if compact:
+                self.sidebar.setMinimumWidth(0)
+                self.sidebar.setMaximumWidth(16777215)
+                self.sidebar.setFixedHeight(162 + (40 if not self.focus.isHidden() else 0))
+            else:
+                self.sidebar.setMinimumHeight(0)
+                self.sidebar.setMaximumHeight(16777215)
+                self.sidebar.setFixedWidth(max(248, min(326, round((self.width() - 74) * .33))))
+        finally:
+            self._updating_layout = False
 
     def open_preferences(self):
         self.preferences.showNormal()
@@ -444,11 +494,13 @@ class ControlPanel(QWidget):
         ai = self.settings.get("provider")
         self.mode.setText("●  AI enabled" if ai else "●  Offline")
         self.mode.setToolTip("Chat uses your configured AI provider" if ai else "Offline companion replies stay on this device")
+        self.chat_info.setVisible(not self.compact or ai)
         self.chat_info.setText("AI enabled · Messages are sent to your chosen provider." if ai else "A cozy place to pause. Offline replies stay on this device.")
 
     def set_state(self, state):
         titles = {"sleeping": "Dreaming", "walking": "On a stroll", "happy": "Feeling loved", "dragged": "Wheee!", "idle": "Feeling cozy", "entering": "Hello there", "leaving": "See you soon", "working": "Working together", "greeting": "Hello, friend!", "exploring": "Looking around", "following": "Right behind you"}
-        self.state.setText("●  " + titles.get(state, state.title()))
+        title = self.sprites.spec(state).get("label", titles.get(state, state.replace("_", " ").capitalize()))
+        self.state.setText("●  " + title)
 
     def set_activity(self, key):
         for activity, tile in self.activity_buttons.items():
@@ -465,6 +517,7 @@ class ControlPanel(QWidget):
         else:
             self.focus.setText("◷  Focus together · 25 min")
             self.activity_buttons["work"].setText("Work")
+        self.apply_layout()
 
     def add_message(self, who, message, mine=False, error=False):
         self.transcript.add_message(who, message, mine, error)

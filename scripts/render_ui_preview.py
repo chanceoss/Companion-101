@@ -23,6 +23,11 @@ def main():
 
         def capture_main():
             controller.panel.grab().save(str(output / "companion.png"))
+            controller.panel.resize(480, 540)
+            QTimer.singleShot(100, capture_compact)
+
+        def capture_compact():
+            controller.panel.grab().save(str(output / "compact.png"))
             controller.panel.open_preferences()
             QTimer.singleShot(100, capture_preferences)
 
@@ -33,6 +38,7 @@ def main():
         QTimer.singleShot(250, capture_main)
         code = app.exec()
     print(output / "companion.png")
+    print(output / "compact.png")
     print(output / "preferences.png")
     return code
 

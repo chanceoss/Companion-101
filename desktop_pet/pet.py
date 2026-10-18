@@ -57,8 +57,9 @@ class PetWindow(QWidget):
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setMouseTracking(True)
         self.setCursor(Qt.OpenHandCursor)
-        walking = sprites.spec("walking")
-        self.animator = Animator(walking["fps"], len(walking["frames"]))
+        self.animator = Animator(library=sprites.animation_library)
+        self._previous_facing = "front"
+        self._previous_direction = 1
         self.pose = self.animator.advance(0)
         self.bubble = SpeechBubble()
         self.drag_offset = None
@@ -105,8 +106,9 @@ class PetWindow(QWidget):
         self.move(*clamp_position(self.x(), self.y(), area.left(), area.top(), area.right() + 1,
                                  area.bottom() + 1, self.width(), self.height()))
 
-    def set_state(self, state):
-        self.animator.set_state(state)
+    def set_state(self, state, restart=False, *, transition=True):
+        self._previous_facing, self._previous_direction = self.walk_facing, self.direction
+        self.animator.set_state(state, restart=restart, transition=transition)
         if state != "walking":
             self.walk_motion = None
         self.state_changed.emit(state)
@@ -131,8 +133,8 @@ class PetWindow(QWidget):
 
     def greet(self):
         # A greeting briefly overlays the current activity without losing its timer.
-        self.greeting_until = time.monotonic() + 4
-        self.set_state("greeting")
+        self.greeting_until = time.monotonic() + self.animator.library.duration("greeting")
+        self.set_state("greeting", restart=True)
         self.particles.extend([(random.uniform(.3, .7), i * -.12) for i in range(4)])
         self.activity_changed.emit("greet")
         self.say(f"Hi, friend! {self.settings.get('name')} is very happy to see you. 🧡")
@@ -183,7 +185,7 @@ class PetWindow(QWidget):
                 self.restore_activity()
             self.activity_changed.emit(self.activity)
         state = self.animator.state
-        if state == "leaving" and self.animator.elapsed >= .6:
+        if state == "leaving" and self.animator.finished:
             self.hide()
             self.bubble.hide()
             self.hidden_to_tray.emit()
@@ -224,26 +226,33 @@ class PetWindow(QWidget):
         painter.translate(self.width() / 2, self.height() - 20 * unit + pose.bob * unit)
         painter.rotate(pose.rotation)
         painter.scale(pose.sx, pose.sy)
-        walking = self.animator.state == "walking"
-        if walking and self.walk_facing == "side" and self.direction < 0:
-            painter.scale(-1, 1)
-        pixmap = self.sprites.frame(self.animator.state, self.animator.elapsed, self.walk_facing)
-        width = 255 * unit
-        height = width * pixmap.height() / pixmap.width()
-        rect = QRectF(-width / 2, -height, width, height)
-        painter.drawPixmap(rect, pixmap, QRectF(pixmap.rect()))
-        # Coordinates live in the manifest so replacement art can move the eyelids.
-        if pose.blink:
-            for ex, ey, ew, eh in self.sprites.eyes(self.animator.state):
-                eye = QRectF(rect.x() + ex * width, rect.y() + ey * height, ew * width, eh * height)
-                painter.setPen(Qt.NoPen)
-                painter.setBrush(QColor("#eda33f"))
-                painter.drawEllipse(eye.adjusted(-unit, -unit, unit, unit))
-                line = QPainterPath()
-                line.moveTo(eye.left() + 2 * unit, eye.center().y())
-                line.quadTo(eye.center().x(), eye.bottom() - 3 * unit, eye.right() - 2 * unit, eye.center().y())
-                painter.setPen(QPen(QColor("#53331e"), 2 * unit, Qt.SolidLine, Qt.RoundCap))
-                painter.drawPath(line)
+        layers = self.animator.layers()
+        for index, (state, elapsed, weight) in enumerate(layers):
+            outgoing = len(layers) > 1 and index == 0
+            facing = self._previous_facing if outgoing else self.walk_facing
+            direction = self._previous_direction if outgoing else self.direction
+            painter.save()
+            painter.setOpacity(pose.opacity * weight)
+            if self.sprites.spec(state).get("mirror_left") and facing == "side" and direction < 0:
+                painter.scale(-1, 1)
+            pixmap = self.sprites.frame(state, elapsed, facing)
+            width = 255 * unit
+            height = width * pixmap.height() / pixmap.width()
+            rect = QRectF(-width / 2, -height, width, height)
+            painter.drawPixmap(rect, pixmap, QRectF(pixmap.rect()))
+            # Coordinates live in the manifest so replacement art can move the eyelids.
+            if pose.blink:
+                for ex, ey, ew, eh in self.sprites.eyes(state):
+                    eye = QRectF(rect.x() + ex * width, rect.y() + ey * height, ew * width, eh * height)
+                    painter.setPen(Qt.NoPen)
+                    painter.setBrush(QColor("#eda33f"))
+                    painter.drawEllipse(eye.adjusted(-unit, -unit, unit, unit))
+                    line = QPainterPath()
+                    line.moveTo(eye.left() + 2 * unit, eye.center().y())
+                    line.quadTo(eye.center().x(), eye.bottom() - 3 * unit, eye.right() - 2 * unit, eye.center().y())
+                    painter.setPen(QPen(QColor("#53331e"), 2 * unit, Qt.SolidLine, Qt.RoundCap))
+                    painter.drawPath(line)
+            painter.restore()
         painter.restore()
         painter.setFont(QFont("Segoe UI", round(17 * unit), QFont.Bold))
         for x, age in self.particles:

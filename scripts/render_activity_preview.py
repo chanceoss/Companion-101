@@ -29,8 +29,8 @@ def main():
             painter.setFont(QFont("Segoe UI", 10))
             painter.setPen(QColor("#77614d"))
             for col, activity in enumerate(ACTIVITIES):
-                pet.set_state("idle")
-                pet.set_state(activity.scene)
+                pet.set_state("idle", transition=False)
+                pet.set_state(activity.scene, transition=False)
                 pet.pose = pet.animator.advance(index / 8)
                 painter.drawPixmap(col * pet.width(), 0, pet.grab())
                 painter.drawText(col * pet.width(), stage.height() - 30, pet.width(), 25,

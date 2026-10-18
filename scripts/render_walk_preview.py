@@ -32,8 +32,8 @@ def main():
             painter.setPen(QColor("#77614d"))
             for col, (title, vector) in enumerate((("Walking down", (0, 1)), ("Walking right", (1, 0)),
                                                     ("Walking left", (-1, 0)), ("Walking up", (0, -1)))):
-                pet.set_state("idle")
-                pet.set_state("walking")
+                pet.set_state("idle", transition=False)
+                pet.set_state("walking", transition=False)
                 pet.walk_motion = WalkMotion(0, 0, *vector)
                 pet.direction = -1 if vector[0] < 0 else 1
                 pet.pose = pet.animator.advance(index / spec["fps"])

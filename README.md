@@ -20,15 +20,17 @@ py -3.12 -m venv .venv
 .venv\Scripts\python run_pet.py
 ```
 
-The companion panel opens on first launch. Biscuit and the activities live in the left sidebar; chat is visible beside them with avatars, timestamps, and message bubbles. The cream, sage, and garden design uses native Qt widgets and bundled rounded fonts. The sidebar scrolls on shorter windows while the chat composer stays visible. Windows supplies the normal title-bar controls.
+The companion panel opens on first launch. Biscuit and the activities live in the left sidebar; chat is visible beside them with avatars, timestamps, and message bubbles. The cream, sage, and garden design uses native Qt widgets and bundled rounded fonts. Below 800 pixels wide, the panel switches to a compact activity strip above chat, hiding the large portrait and decorative text. It fits a **480 × 540** window, including the settings gear, all five activities, focus timer, and chat composer. Wider windows restore the sidebar automatically. Windows supplies the normal title-bar controls.
 
-The **small gear button in the upper-right corner opens Preferences**. You can also use **Ctrl+,**. The former Preferences tab is now a separate, reusable settings window with the same name, size, reminders, Windows startup, and optional AI controls. **Save preferences** applies changes; **Close** or **Escape** dismisses the window. Pet size updates immediately as the slider moves.
+![Compact native panel at 480 × 540](docs/compact.png)
+
+The **small gear button in the upper-right corner opens Preferences**. You can also use **Ctrl+,**. **Save preferences** applies the name, reminders, size, and Windows startup settings independently of AI fields. **Save AI connection** applies the optional provider settings separately. Neither save erases the conversation. **Close** or **Escape** dismisses the window. Pet size updates immediately as the slider moves.
 
 Closing the main panel keeps the pet alive. Use **Quit Biscuit** in Preferences or **Quit Biscuit** in the tray menu to exit. A second launch brings the existing companion back instead of creating another pet. The pet has no taskbar button; its control panel has one.
 
 ## Companion activities
 
-Choose an illustrated activity tile in the left sidebar, or choose the same activity from the pet's right-click/tray menu. The cards are labeled **Explore**, **Work**, **Hi**, **Nap**, and **Follow**. The active tile is highlighted and the hero portrait changes to match. Clicking the large portrait gives Biscuit a little affection.
+Choose an illustrated activity tile in the sidebar or compact activity strip, or choose the same activity from the pet's right-click/tray menu. The cards are labeled **Explore**, **Work**, **Hi**, **Nap**, and **Follow**. Explore has one panel control: its tile toggles roaming and stays synchronized with the tray menu and remembered preference. The active tile is highlighted and the hero portrait changes to match. Clicking the large portrait gives Biscuit a little affection.
 
 | Activity | What Biscuit does |
 | --- | --- |
@@ -60,7 +62,9 @@ The Explore preference is remembered on restart. Work sessions, greetings, naps,
 | Focus together | Starts Work with me and its 25-minute timer; click again to cancel |
 | Upper-right gear / Ctrl+, | Opens Preferences: name, size, reminders, Windows startup, AI connection |
 
-The pet breathes, bobs, blinks, squashes, stretches, dangles when dragged, and animates when appearing/disappearing. Walking uses four frames per direction at 8 fps, with subtle motion synchronized to the gait. Biscuit faces forward when moving down the screen, away when moving up, and sideways when moving horizontally; leftward travel mirrors the right-facing cycle. Diagonal movement uses the dominant direction and the same overall speed as straight movement. Screen edges turn the pet around. Walking frames use their own eye configuration so front-facing idle eyelids never cover a side or back view.
+The pet breathes, bobs, blinks, squashes, stretches, dangles when dragged, and animates when appearing/disappearing. While resting, Biscuit randomly looks around or stretches, then returns to idle. Activities blend between poses and artwork. All clip motion, frame timing, playback modes, transitions, and idle choices are configured in `sprites.json`; see the [animation guide](docs/animations.md).
+
+Walking uses four frames per direction at 8 fps, with subtle motion synchronized to the gait. Biscuit faces forward when moving down the screen, away when moving up, and sideways when moving horizontally; leftward travel mirrors the right-facing cycle. Diagonal movement uses the dominant direction and the same overall speed as straight movement. Screen edges turn the pet around. Walking frames use their own eye configuration so front-facing idle eyelids never cover a side or back view.
 
 ![Walking preview exported from the actual native pet renderer](docs/walking.gif)
 
@@ -76,11 +80,13 @@ For open-ended AI conversation:
 
 1. Click the **upper-right gear** to open **Preferences**, then enable **Use an OpenAI-compatible AI provider**.
 2. Enter a base URL (for example, `https://api.openai.com/v1`), a model supported by your account, and your API key. The default model is `gpt-4o-mini`; availability depends on the provider/account.
-3. Choose whether to remember the key, then **Save preferences**.
+3. Choose whether to remember the key, then **Save AI connection**. Pressing Enter in a URL, model, or key field also saves only the AI connection.
+
+URL and model are required only when enabling AI. With AI disabled, they can be empty. A supplied URL is validated before saving. General companion preferences can be saved even while AI fields are incomplete.
 
 An OpenAI-compatible local server can use a base URL such as `http://localhost:1234/v1` and its local model ID, with an empty key if the server permits. Remote endpoints require HTTPS. TLS verification remains enabled, and API redirects are rejected so credentials are not forwarded to another destination. Requests run asynchronously with a 45-second transfer timeout, leaving the pet responsive. Errors appear in chat without exposing provider response bodies.
 
-AI mode sends your message, a companion personality prompt, and up to 20 recent conversation messages to the configured provider. There is no screen capture, microphone recording, file access, or desktop automation. Conversation history is held in memory only. **Clear conversation** discards it. Changing/saving provider preferences also clears the conversation context. Provider fees and connectivity are your responsibility.
+AI mode sends your message, a companion personality prompt, and up to 20 recent conversation messages to the configured provider. There is no screen capture, microphone recording, file access, or desktop automation. Conversation history is held in memory only. The trash button labeled **Clear conversation** explicitly discards both the visible chat and AI context. Saving preferences keeps both. Changing the AI connection cancels an unfinished request while retaining completed messages; an unchanged save leaves the request running. Subsequent AI messages use the retained context with the selected provider. Provider fees and connectivity are your responsibility.
 
 The API key is held in memory, or saved with `keyring` to **Windows Credential Manager** if you choose to remember it. It never goes in `settings.json`. Uncheck the remember option and save to remove the stored key. If secure storage is unavailable, the app reports that the key is session-only. Nonsecret preferences use Qt's application-data location (typically `%LOCALAPPDATA%\Companion101\BiscuitCompanion`). Windows startup uses the current user's `Run` registry key; disable it in Preferences before moving/removing the app. No administrator rights are required.
 
@@ -106,7 +112,7 @@ python3 -m venv .venv
 QT_QPA_PLATFORM=offscreen .venv/bin/python run_pet.py --smoke-test
 ```
 
-On Windows use `.venv\Scripts\python` instead. `--smoke-test` bypasses single-instance locking, renders the native widgets, and exits after two seconds. Tests cover the simultaneous companion/chat layout, gear navigation, Preferences saving/closing, resized windows, plain-text message wrapping, bundled fonts, all five activities, greeting restoration, focus timing, pointer following, dragging, directional walking, sprite configuration, corrupted preferences, offline chat, clean shutdown, and real async requests against a local mock AI provider. They do not call a paid provider.
+On Windows use `.venv\Scripts\python` instead. `--smoke-test` bypasses single-instance locking, renders the native widgets, and exits after two seconds. Tests cover the simultaneous companion/chat layout, gear navigation, separate preference saves, conversation preservation and request cancellation, compact/wide resizing, plain-text message wrapping, bundled fonts, all five activities, greeting restoration, focus timing, pointer following, dragging, directional walking, configurable animation playback, randomized idle choices, transitions, sprite configuration, corrupted preferences, offline chat, clean shutdown, and real async requests against a local mock AI provider. They do not call a paid provider.
 
 Linux offscreen tests verify the Qt application logic and rendering. **Windows tray behavior, transparent click handling, multiple physical monitors, logon startup, Credential Manager, and the packaged `.exe` require Windows acceptance testing.** A live paid-provider connection requires your configuration and has not been verified by the mock-server tests.
 
@@ -122,7 +128,7 @@ Standalone PNG sequences remain supported. Each frame should use the same canvas
 
 The bundled `walk-cycle.png` is an atlas: four columns and three rows (front, right-facing side, back). The `atlases` section in `sprites.json` declares the file and grid. A frame can select a cell with `{"atlas": "walk", "column": 0, "row": 1}`. Optional normalized `row_edges` account for unequal row heights in a source sheet. At startup, cells are extracted, scaled together, and aligned at their bottom center to prevent sheet placement differences from making the pet jump. All resulting frames are cached; walking performs no disk reads or sheet processing.
 
-`activities.png` is a five-column, single-row atlas for Explore, Work, Greet, Nap, and Follow. Its normalized `column_edges` keep full silhouettes and props inside each cell. Each activity uses one pose plus procedural motion; you can replace it with a multi-frame sequence later. These poses disable the idle eye overlay because their eye positions and expressions differ.
+`activities.png` is a five-column, single-row atlas for Explore, Work, Greet, Nap, and Follow. Its normalized `column_edges` keep full silhouettes and props inside each cell. The included activity artwork uses one pose per activity plus configured motion; replacing any state's `frames` list with several PNGs or atlas cells immediately enables multi-frame playback. These poses disable the idle eye overlay because their eye positions and expressions differ. See [the animation configuration guide](docs/animations.md) for looping, one-shot and ping-pong clips, randomized idle variants, motion keyframes, and transitions.
 
 `directions.side` and `directions.back` select the other walking views; the default `frames` sequence supplies the front view. All directions share the state's `fps` and frame count. Left-facing side frames are mirrored at render time. Top-level `eyes` contains normalized `[x, y, width, height]` rectangles for procedural eyelids; a state can override it with `"eyes": []` for art with different eye positions. The `canvas` entry documents the idle artwork size. Keep all sprite paths inside the asset directory. The existing Windows build automatically includes the atlas and manifest; rebuild it after changing assets.
 
@@ -141,8 +147,9 @@ desktop_pet/
   app.py       Application lifecycle, tray, focus timer, single instance
   activities.py Shared activity titles, scenes, colors, and descriptions
   pet.py       Native transparent window, painting, input, movement
-  model.py     Procedural animation, roaming motion, offline responses
-  panel.py     Two-column native panel, illustrated sidebar, settings gear
+  animations.py Configurable clips, frame timing, idle choices, pose transitions
+  model.py     Roaming motion and offline responses
+  panel.py     Responsive native panel, activity tiles, chat, settings gear
   chat_widgets.py Native message bubbles, avatars, timestamps, chat scrolling
   preferences.py Gear-opened Preferences window
   theme.py     Native garden/icon painting and offline font loading

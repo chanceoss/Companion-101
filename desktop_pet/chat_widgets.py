@@ -1,6 +1,6 @@
 """Native message bubbles: plain text, selection, avatars, timestamps, and scrolling."""
 import math
-from PySide6.QtCore import Qt, QRectF, QDateTime, QTimer
+from PySide6.QtCore import Qt, QRectF, QDateTime, QTimer, QSize
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QTextOption
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QScrollArea, QSizePolicy,
                                QTextBrowser, QVBoxLayout, QWidget)
@@ -100,6 +100,9 @@ class Message(QWidget):
 
 
 class ChatHistory(QScrollArea):
+    def minimumSizeHint(self):
+        return QSize(0, 40)
+
     def __init__(self, sprites):
         super().__init__()
         self.sprites = sprites
@@ -126,10 +129,14 @@ class ChatHistory(QScrollArea):
         QTimer.singleShot(0, self.scroll_to_bottom)
 
     def scroll_to_bottom(self, *args):
-        self.verticalScrollBar().setValue(self.verticalScrollBar().maximum())
+        self.verticalScrollBar().setValue(0 if len(self.messages) <= 1 else self.verticalScrollBar().maximum())
 
     def toPlainText(self):
         return "\n\n".join(f"{who}\n{text}" for who, text in self.messages)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.rows.setContentsMargins(16, 16, 14, max(12, min(110, self.viewport().height() // 5)))
 
     def clear(self):
         self.messages.clear()
