@@ -12,6 +12,7 @@ from .panel import ControlPanel
 from .pet import PetWindow
 from .sprites import SpriteBank, ASSETS
 from .storage import Settings
+from .gestures import GESTURES
 
 
 class Application:
@@ -41,6 +42,12 @@ class Application:
         self.sleep_action = self.action("Take a nap / wake up", self.toggle_sleep)
         self.follow_action = self.action("Follow me", lambda: self.activate_activity("follow"), checkable=True)
         self.action("Rest here / stop activity", lambda: self.activate_activity("idle"))
+        self.gesture_menu = self.menu.addMenu("Biscuit reactions")
+        self.gesture_actions = {}
+        for state, title in GESTURES:
+            action = self.gesture_menu.addAction(title)
+            action.triggered.connect(lambda checked=False, key=state: self.perform_gesture(key))
+            self.gesture_actions[state] = action
         self.pass_through = self.action("Click through pet", self.set_click_through, checkable=True)
         self.action("Hide pet", self.hide_pet)
         self.menu.addSeparator()
@@ -68,6 +75,7 @@ class Application:
         self.panel.quit_requested.connect(self.quit)
         self.panel.focus_requested.connect(self.toggle_focus)
         self.panel.activity_requested.connect(self.activate_activity)
+        self.panel.gesture_requested.connect(self.perform_gesture)
         self.companion.answered.connect(self.answer)
         self.companion.failed.connect(lambda message: self.panel.add_message("Connection", message, error=True))
         self.companion.busy_changed.connect(self.panel.set_busy)
@@ -117,7 +125,14 @@ class Application:
     def show_love(self):
         if not self.pet.isVisible():
             self.summon()
-        self.pet.pet()
+        if self.pet.pet():
+            self.panel.perform_gesture("happy")
+
+    def perform_gesture(self, state):
+        if not self.pet.isVisible():
+            self.summon()
+        if self.pet.perform_gesture(state):
+            self.panel.perform_gesture(state)
 
     def toggle_sleep(self):
         self.activate_activity("nap")
@@ -186,7 +201,8 @@ class Application:
     def answer(self, message):
         self.panel.add_message(self.settings.get("name"), message)
         self.pet.say(message)
-        if self.pet.animator.state != "sleeping":
+        if (self.pet.activity != "nap" and not self.pet.gesture
+                and self.pet.animator.state not in ("sleeping", "leaving", "dragged")):
             self.pet.set_state("happy")
 
     def toggle_focus(self):

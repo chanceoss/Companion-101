@@ -1,11 +1,13 @@
 import math
 import random
 import time
-from PySide6.QtCore import Qt, QPoint, QPointF, QRectF, QTimer, Signal
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen, QFont, QCursor
+from PySide6.QtCore import Qt, QPoint, QPointF, QTimer, Signal
+from PySide6.QtGui import QColor, QPainter, QFont, QCursor
 from PySide6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout
 from .model import Animator, WalkMotion, FollowMotion, clamp_position
 from .activities import SCENES
+from .gestures import GESTURE_STATES
+from .rendering import draw_character
 
 
 class SpeechBubble(QWidget):
@@ -58,8 +60,7 @@ class PetWindow(QWidget):
         self.setMouseTracking(True)
         self.setCursor(Qt.OpenHandCursor)
         self.animator = Animator(library=sprites.animation_library)
-        self._previous_facing = "front"
-        self._previous_direction = 1
+        self.animator.render_views = {}
         self.pose = self.animator.advance(0)
         self.bubble = SpeechBubble()
         self.drag_offset = None
@@ -73,6 +74,8 @@ class PetWindow(QWidget):
         self.follow_motion = None
         self.activity = "explore" if settings.get("wander") else "idle"
         self.greeting_until = 0
+        self.gesture = None
+        self._paused_greeting = None
         self.wander_until = 0
         self.next_wander = time.monotonic() + 8
         self.next_reminder = time.monotonic() + 25 * 60
@@ -107,7 +110,8 @@ class PetWindow(QWidget):
                                  area.bottom() + 1, self.width(), self.height()))
 
     def set_state(self, state, restart=False, *, transition=True):
-        self._previous_facing, self._previous_direction = self.walk_facing, self.direction
+        for old_state, elapsed, _ in self.animator.layers():
+            self.animator.render_views.setdefault((old_state, elapsed), (self.walk_facing, self.direction))
         self.animator.set_state(state, restart=restart, transition=transition)
         if state != "walking":
             self.walk_motion = None
@@ -115,12 +119,54 @@ class PetWindow(QWidget):
 
     @property
     def display_activity(self):
-        return "greet" if self.greeting_until else self.activity
+        return "greet" if self.greeting_until or self._paused_greeting else self.activity
+
+    def cancel_gesture(self, *, resume_greeting=False):
+        if resume_greeting and self._paused_greeting:
+            self.greeting_until = time.monotonic() + self._paused_greeting[0]
+        self.gesture = None
+        self._paused_greeting = None
+
+    def perform_gesture(self, state):
+        if state not in GESTURE_STATES:
+            raise ValueError(f"Unknown Biscuit reaction: {state}")
+        return self._start_gesture(state)
+
+    def _start_gesture(self, state):
+        # A reaction is a brief overlay; the current activity and focus clock stay put.
+        if self.animator.state in ("leaving", "dragged") or self.drag_offset is not None:
+            return False
+        if self.greeting_until:
+            remaining = max(0, self.greeting_until - time.monotonic())
+            self._paused_greeting = (remaining, self.animator.elapsed)
+            self.greeting_until = 0
+        self.gesture = state
+        self.follow_motion = None
+        self.set_state(state, restart=True)
+        return True
+
+    def finish_gesture(self):
+        self.gesture = None
+        if self._paused_greeting:
+            remaining, elapsed = self._paused_greeting
+            self._paused_greeting = None
+            if remaining > 0:
+                self.greeting_until = time.monotonic() + remaining
+                self.set_state("greeting", restart=True)
+                self.animator.elapsed = elapsed
+            else:
+                self.greeting_until = 0
+                self.restore_activity()
+        else:
+            self.restore_activity()
+        self.pose = self.animator.advance(0)
+        self.activity_changed.emit(self.display_activity)
 
     def set_activity(self, activity):
         if activity not in SCENES or activity == "greet":
             raise ValueError(f"Unknown persistent pet activity: {activity}")
         self.activity = activity
+        self.cancel_gesture()
         self.greeting_until = 0
         self.follow_motion = None
         self.next_wander = time.monotonic() + .7
@@ -133,11 +179,15 @@ class PetWindow(QWidget):
 
     def greet(self):
         # A greeting briefly overlays the current activity without losing its timer.
+        if self.animator.state in ("leaving", "dragged"):
+            return False
+        self.cancel_gesture()
         self.greeting_until = time.monotonic() + self.animator.library.duration("greeting")
         self.set_state("greeting", restart=True)
         self.particles.extend([(random.uniform(.3, .7), i * -.12) for i in range(4)])
         self.activity_changed.emit("greet")
         self.say(f"Hi, friend! {self.settings.get('name')} is very happy to see you. 🧡")
+        return True
 
     def start_walk(self, now):
         # Mostly horizontal strolls, with front/back and diagonal exploration too.
@@ -179,6 +229,8 @@ class PetWindow(QWidget):
         self._last = now
         if not self.isVisible():
             return
+        if self.gesture and self.animator.state != self.gesture:
+            self.finish_gesture()
         if self.greeting_until and now >= self.greeting_until:
             self.greeting_until = 0
             if self.animator.state not in ("leaving", "dragged"):
@@ -209,7 +261,9 @@ class PetWindow(QWidget):
         previous = self.animator.state
         self.pose = self.animator.advance(dt)
         if previous != self.animator.state:
-            if self.animator.state == "idle" and self.activity != "idle":
+            if self.gesture:
+                self.finish_gesture()
+            elif self.animator.state == "idle" and self.activity != "idle":
                 self.restore_activity()
                 self.pose = self.animator.advance(0)
             self.state_changed.emit(self.animator.state)
@@ -220,39 +274,10 @@ class PetWindow(QWidget):
         painter = QPainter(self)
         painter.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
         unit = self.width() / 290
-        pose = self.pose
         painter.save()
-        painter.setOpacity(pose.opacity)
-        painter.translate(self.width() / 2, self.height() - 20 * unit + pose.bob * unit)
-        painter.rotate(pose.rotation)
-        painter.scale(pose.sx, pose.sy)
-        layers = self.animator.layers()
-        for index, (state, elapsed, weight) in enumerate(layers):
-            outgoing = len(layers) > 1 and index == 0
-            facing = self._previous_facing if outgoing else self.walk_facing
-            direction = self._previous_direction if outgoing else self.direction
-            painter.save()
-            painter.setOpacity(pose.opacity * weight)
-            if self.sprites.spec(state).get("mirror_left") and facing == "side" and direction < 0:
-                painter.scale(-1, 1)
-            pixmap = self.sprites.frame(state, elapsed, facing)
-            width = 255 * unit
-            height = width * pixmap.height() / pixmap.width()
-            rect = QRectF(-width / 2, -height, width, height)
-            painter.drawPixmap(rect, pixmap, QRectF(pixmap.rect()))
-            # Coordinates live in the manifest so replacement art can move the eyelids.
-            if pose.blink:
-                for ex, ey, ew, eh in self.sprites.eyes(state):
-                    eye = QRectF(rect.x() + ex * width, rect.y() + ey * height, ew * width, eh * height)
-                    painter.setPen(Qt.NoPen)
-                    painter.setBrush(QColor("#eda33f"))
-                    painter.drawEllipse(eye.adjusted(-unit, -unit, unit, unit))
-                    line = QPainterPath()
-                    line.moveTo(eye.left() + 2 * unit, eye.center().y())
-                    line.quadTo(eye.center().x(), eye.bottom() - 3 * unit, eye.right() - 2 * unit, eye.center().y())
-                    painter.setPen(QPen(QColor("#53331e"), 2 * unit, Qt.SolidLine, Qt.RoundCap))
-                    painter.drawPath(line)
-            painter.restore()
+        painter.translate(self.width() / 2, self.height() - 20 * unit)
+        draw_character(painter, self.sprites, self.animator, self.pose, 255 * unit,
+                       facing=self.walk_facing, direction=self.direction)
         painter.restore()
         painter.setFont(QFont("Segoe UI", round(17 * unit), QFont.Bold))
         for x, age in self.particles:
@@ -265,9 +290,11 @@ class PetWindow(QWidget):
             painter.drawText(QPointF(self.width() * .72, self.height() - 165 * unit + math.sin(self.animator.elapsed * 2) * 5 * unit), "z Z")
 
     def pet(self):
-        self.set_state("happy")
+        if not self._start_gesture("happy"):
+            return False
         self.particles.extend([(random.uniform(.3, .7), i * -.12) for i in range(3)])
         self.say(random.choice(["A little affection goes a long way. 🧡", "That’s the spot!", "You + me = a very good day.", "Tiny paws. Big feelings. 🐾"]))
+        return True
 
     def say(self, message):
         if self.isVisible():
@@ -280,11 +307,15 @@ class PetWindow(QWidget):
 
     def hide_animated(self):
         self.bubble.hide()
+        self.cancel_gesture()
+        self.greeting_until = 0
         self.set_state("leaving")
 
     def summon(self):
         self.set_click_through(False)
         self.restore_position()
+        self.cancel_gesture()
+        self.greeting_until = 0
         self.set_state("entering")
         self._last = time.monotonic()
         self.show()
@@ -308,6 +339,8 @@ class PetWindow(QWidget):
             if (event.globalPosition().toPoint() - self.press_pos).manhattanLength() > QApplication.startDragDistance():
                 self.dragged = True
                 self.click_timer.stop()
+                if self.gesture:
+                    self.cancel_gesture(resume_greeting=True)
                 self.set_state("dragged")
                 self.setCursor(Qt.ClosedHandCursor)
             if self.dragged:

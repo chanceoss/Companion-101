@@ -31,8 +31,8 @@ def test_directional_cycle_uses_distinct_frames_and_loops(app):
 @pytest.mark.parametrize("broken", ["cell", "direction", "row_edges", "column_edges", "path"])
 def test_bad_sprite_configuration_reports_actionable_error(app, tmp_path, broken):
     config = json.loads((ASSETS / "sprites.json").read_text())
-    for filename in ("biscuit.png", "walk-cycle.png", "activities.png"):
-        shutil.copyfile(ASSETS / filename, tmp_path / filename)
+    for path in ASSETS.glob("*.png"):
+        shutil.copyfile(path, tmp_path / path.name)
     if broken == "cell":
         config["states"]["walking"]["frames"][0]["column"] = 100
         expected = "Invalid sprite atlas cell"

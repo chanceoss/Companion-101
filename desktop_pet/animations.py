@@ -11,6 +11,7 @@ import random
 @dataclass(frozen=True)
 class Pose:
     bob: float = 0
+    x: float = 0
     rotation: float = 0
     sx: float = 1
     sy: float = 1
@@ -77,7 +78,7 @@ class AnimationLibrary:
             if not isinstance(spec.get("motion", {}), dict):
                 raise ValueError(f"Motion in {name} must be an object.")
             for channel, config in spec.get("motion", {}).items():
-                if channel not in ("bob", "rotation", "sx", "sy", "opacity"):
+                if channel not in ("bob", "x", "rotation", "sx", "sy", "opacity"):
                     raise ValueError(f"Unknown motion channel {channel} in {name}.")
                 if isinstance(config, (int, float)):
                     number(config, f"{name}.{channel}")
@@ -207,7 +208,7 @@ class Animator:
         self.elapsed = self.clock = 0.0
         self.blink_at = self.rng.uniform(*self.library.blink["interval"])
         self._idle_at = math.inf
-        self._previous = None
+        self._previous = []
         self._transition_start = 0.0
         self._transition_duration = 0.0
         self._transition_easing = "smoothstep"
@@ -227,14 +228,18 @@ class Animator:
             raise ValueError(f"Unknown animation: {state}")
         if state == self.state and not restart:
             return
-        self._previous = self.state, self.elapsed
-        self._from_pose = self._pose
+        # Keep every visible source when an activity interrupts a crossfade.
+        # Capturing just the outgoing state would discard part of the rendered
+        # picture and cause a pop when users switch activities quickly.
+        self._previous = self._normalize_layers(self.layers())
+        self._from_pose = self._sample_pose()
         self.state, self.elapsed = state, 0.0
         config = self.library.states[state].get("transition", self.library.transition)
         self._transition_duration = config.get("duration", 0) if transition else 0
         self._transition_easing = config.get("easing", "smoothstep")
         self._transition_start = self.clock
         self._schedule_idle()
+        self._pose = self._sample_pose()
 
     @property
     def finished(self):
@@ -250,35 +255,57 @@ class Animator:
     def layers(self):
         weight = self.blend
         if self._previous and weight < 1:
-            state, elapsed = self._previous
-            return [(state, elapsed, 1 - weight), (self.state, self.elapsed, weight)]
+            return self._normalize_layers([
+                (state, elapsed, source_weight * (1 - weight))
+                for state, elapsed, source_weight in self._previous
+            ] + [(self.state, self.elapsed, weight)])
         return [(self.state, self.elapsed, 1)]
 
-    def advance(self, dt):
-        dt = max(0, number(dt, "Animation elapsed time"))
-        self.clock += dt
-        self.elapsed += dt
-        if self.clock > self.blink_at + self.library.blink["duration"]:
-            self.blink_at = self.clock + self.rng.uniform(*self.library.blink["interval"])
-        # A limited chain prevents a pathological custom graph from hanging startup.
-        for _ in range(32):
-            spec = self.library.states[self.state]
-            if not self.finished or spec.get("next") is None:
-                break
-            remaining = self.elapsed - self.library.duration(self.state)
-            self._pose = self.library.sample(self.state, self.library.duration(self.state), False)
-            self.set_state(spec["next"])
-            self.elapsed = remaining
-            self._transition_start -= remaining
-            self._idle_at -= remaining
-        if self.clock >= self._idle_at:
-            idle = self.library.idle
-            variant = self.rng.choices(idle["variants"], weights=idle.get("weights"), k=1)[0]
-            self.set_state(variant)
+    @staticmethod
+    def _normalize_layers(layers):
+        """Freeze visible frames, merging duplicates and pruning tiny remnants."""
+        sources = {}
+        for state, elapsed, weight in layers:
+            if weight > 1e-8:
+                key = (state, elapsed)
+                sources[key] = sources.get(key, 0) + weight
+        total = sum(sources.values())
+        return [(state, elapsed, weight / total)
+                for (state, elapsed), weight in sources.items()] if total else []
+
+    def _sample_pose(self):
         blinking = self.blink_at <= self.clock <= self.blink_at + self.library.blink["duration"]
         target = self.library.sample(self.state, self.elapsed, blinking)
         weight = self.blend
         values = {f.name: getattr(self._from_pose, f.name) * (1 - weight) + getattr(target, f.name) * weight
                   for f in fields(Pose) if f.name != "blink"}
-        self._pose = Pose(**values, blink=target.blink)
+        return Pose(**values, blink=target.blink)
+
+    def _step(self, dt):
+        self.clock += dt
+        self.elapsed += dt
+        if self.clock > self.blink_at + self.library.blink["duration"]:
+            self.blink_at = self.clock + self.rng.uniform(*self.library.blink["interval"])
+        self._pose = self._sample_pose()
+
+    def advance(self, dt):
+        remaining = max(0, number(dt, "Animation elapsed time"))
+        # A limited chain prevents a pathological custom graph from hanging startup.
+        for _ in range(32):
+            spec = self.library.states[self.state]
+            duration = self.library.duration(self.state)
+            if (spec.get("playback") != "once" or spec.get("next") is None
+                    or self.elapsed + remaining < duration):
+                break
+            # Stop at the actual clip boundary so its current crossfade, pose,
+            # and terminal frame are captured before consuming any overshoot.
+            step = max(0, duration - self.elapsed)
+            self._step(step)
+            remaining -= step
+            self.set_state(spec["next"], restart=True)
+        self._step(remaining)
+        if self.clock >= self._idle_at:
+            idle = self.library.idle
+            variant = self.rng.choices(idle["variants"], weights=idle.get("weights"), k=1)[0]
+            self.set_state(variant)
         return self._pose

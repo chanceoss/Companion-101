@@ -1,5 +1,6 @@
 """Preload standalone sprites and grid atlases; no image processing in paintEvent."""
 import json
+import math
 from pathlib import Path
 from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QBitmap, QPainter, QPixmap, QRegion
@@ -54,6 +55,13 @@ class SpriteBank:
         if (len(columns) != cols + 1 or columns[0] != 0 or columns[-1] != 1
                 or any(a >= b for a, b in zip(columns, columns[1:]))):
             raise ValueError("Atlas column_edges must increase from 0 to 1 and describe every column.")
+        anchors = spec.get("column_anchors")
+        if anchors is not None:
+            if (not isinstance(anchors, list) or len(anchors) != cols
+                    or any(isinstance(anchor, bool) or not isinstance(anchor, (int, float))
+                           or not math.isfinite(anchor) or not columns[index] < anchor < columns[index + 1]
+                           for index, anchor in enumerate(anchors))):
+                raise ValueError("Atlas column_anchors must give one finite horizontal anchor inside each column.")
         cells = {}
         # Integer boundaries also handle image sizes not divisible by the grid.
         for row in range(rows):
@@ -66,8 +74,8 @@ class SpriteBank:
                 if bounds.isEmpty():
                     raise ValueError(f"Empty sprite in atlas {name}, cell {col},{row}.")
                 cells[col, row] = cell, bounds
-        # One scale preserves proportions. Bottom-center anchors remove small
-        # placement differences in the sheet without resizing individual frames.
+        # One scale preserves proportions. Explicit body anchors keep a moving
+        # tail from recentering the entire character between frames.
         scale = min(432 / max(bounds.height() for _, bounds in cells.values()),
                     446 / max(bounds.width() for _, bounds in cells.values()))
         normalized = {}
@@ -76,7 +84,9 @@ class SpriteBank:
             canvas.fill(Qt.transparent)
             painter = QPainter(canvas)
             painter.setRenderHint(QPainter.SmoothPixmapTransform)
-            x = 240 - (bounds.x() + bounds.width() / 2) * scale
+            center = ((anchors[col] - columns[col]) * sheet.width() if anchors is not None
+                      else bounds.x() + bounds.width() / 2)
+            x = 240 - center * scale
             y = 461 - (bounds.y() + bounds.height()) * scale
             painter.drawPixmap(QRectF(x, y, cell.width() * scale, cell.height() * scale), cell, QRectF(cell.rect()))
             painter.end()

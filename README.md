@@ -2,7 +2,7 @@
 
 A real native desktop pet for **Windows 10/11 x64**. Biscuit sits in a transparent, borderless, always-on-top window over your desktop. The app uses **Python + PySide6 / Qt Widgets**, without a browser, web server, or Electron runtime.
 
-The included transparent character artwork was generated using the supplied references: a plush orange companion with cream cheeks, a striped tail, sage jacket, and a little **B** pendant. It approximates the reference rather than reproducing its original 3D model. A seated sprite drives idle interactions, a 12-frame sheet supplies directional walking cycles, and five illustrated activity poses bring the companion activities to life.
+The included transparent character artwork was generated using the supplied references: a plush orange companion with cream cheeks, a striped tail, sage jacket, and a little **B** pendant. It approximates the reference rather than reproducing its original 3D model. A seated sprite drives idle interactions, a 12-frame sheet supplies directional walking cycles, five illustrated poses bring the companion activities to life, and 24 additional poses supply expressive reactions.
 
 ![Native Qt companion panel rendered during the desktop smoke test](docs/companion.png)
 
@@ -48,6 +48,14 @@ Follow reads only the pointer's position; it does not move the mouse or click an
 
 The Explore preference is remembered on restart. Work sessions, greetings, naps, and Follow are session activities; they do not automatically resume when the app starts. All activities work offline and require no API key.
 
+## Expressive reactions
+
+Open **Reactions** beside the Chat heading, or **Biscuit reactions** in the pet's right-click/tray menu. Choose **Sit down**, **Stretch**, **Yawn**, **Dance**, **Playful hops**, or **Wag tail**. Each plays a short sequence with changing poses and expressions: sleepy eyelids, a wide yawn, grins, winks, surprised eyes, and a swishing striped tail. Hops include anticipation, lift, and a soft squash on landing.
+
+![Expressive reactions exported from the actual native pet renderer](docs/expressions.gif)
+
+Reactions temporarily pause the current pose or movement, then return Biscuit to the selected activity. A Work timer keeps counting during the reaction. Selecting another activity takes effect immediately, and requesting another reaction blends from the pose currently on screen. While resting, Biscuit randomly chooses one of these reactions or looks around every 6–13 seconds.
+
 ## Interact
 
 | Action | Behavior |
@@ -60,9 +68,10 @@ The Explore preference is remembered on restart. Work sessions, greetings, naps,
 | Explore desktop | Short horizontal, vertical, and diagonal strolls, with edge detection |
 | Take a nap / Wake up | Curled sleeping artwork with gentle breathing |
 | Focus together | Starts Work with me and its 25-minute timer; click again to cancel |
+| Reactions / Biscuit reactions | Sit, stretch, yawn, dance, hop, or wag, then resume the selected activity |
 | Upper-right gear / Ctrl+, | Opens Preferences: name, size, reminders, Windows startup, AI connection |
 
-The pet breathes, bobs, blinks, squashes, stretches, dangles when dragged, and animates when appearing/disappearing. While resting, Biscuit randomly looks around or stretches, then returns to idle. Activities blend between poses and artwork. All clip motion, frame timing, playback modes, transitions, and idle choices are configured in `sprites.json`; see the [animation guide](docs/animations.md).
+The pet breathes, bobs, blinks, squashes, stretches, dangles when dragged, and animates when appearing/disappearing. Activities ease between poses and blend their artwork, including when you change activities before a transition finishes. The same renderer animates the desktop pet and panel portrait. All clip motion, frame timing, playback modes, transitions, and idle choices are configured in `sprites.json`; see the [animation guide](docs/animations.md).
 
 Walking uses four frames per direction at 8 fps, with subtle motion synchronized to the gait. Biscuit faces forward when moving down the screen, away when moving up, and sideways when moving horizontally; leftward travel mirrors the right-facing cycle. Diagonal movement uses the dominant direction and the same overall speed as straight movement. Screen edges turn the pet around. Walking frames use their own eye configuration so front-facing idle eyelids never cover a side or back view.
 
@@ -112,7 +121,7 @@ python3 -m venv .venv
 QT_QPA_PLATFORM=offscreen .venv/bin/python run_pet.py --smoke-test
 ```
 
-On Windows use `.venv\Scripts\python` instead. `--smoke-test` bypasses single-instance locking, renders the native widgets, and exits after two seconds. Tests cover the simultaneous companion/chat layout, gear navigation, separate preference saves, conversation preservation and request cancellation, compact/wide resizing, plain-text message wrapping, bundled fonts, all five activities, greeting restoration, focus timing, pointer following, dragging, directional walking, configurable animation playback, randomized idle choices, transitions, sprite configuration, corrupted preferences, offline chat, clean shutdown, and real async requests against a local mock AI provider. They do not call a paid provider.
+On Windows use `.venv\Scripts\python` instead. `--smoke-test` bypasses single-instance locking, renders the native widgets, and exits after two seconds. Tests cover the simultaneous companion/chat layout, gear navigation, separate preference saves, conversation preservation and request cancellation, compact/wide resizing, plain-text message wrapping, bundled fonts, all five activities, greeting and reaction restoration, focus timing, pointer following, dragging, directional walking, configurable animation playback, randomized idle choices, interrupted transitions, sprite configuration, corrupted preferences, offline chat, clean shutdown, and real async requests against a local mock AI provider. They do not call a paid provider.
 
 Linux offscreen tests verify the Qt application logic and rendering. **Windows tray behavior, transparent click handling, multiple physical monitors, logon startup, Credential Manager, and the packaged `.exe` require Windows acceptance testing.** A live paid-provider connection requires your configuration and has not been verified by the mock-server tests.
 
@@ -130,6 +139,8 @@ The bundled `walk-cycle.png` is an atlas: four columns and three rows (front, ri
 
 `activities.png` is a five-column, single-row atlas for Explore, Work, Greet, Nap, and Follow. Its normalized `column_edges` keep full silhouettes and props inside each cell. The included activity artwork uses one pose per activity plus configured motion; replacing any state's `frames` list with several PNGs or atlas cells immediately enables multi-frame playback. These poses disable the idle eye overlay because their eye positions and expressions differ. See [the animation configuration guide](docs/animations.md) for looping, one-shot and ping-pong clips, randomized idle variants, motion keyframes, and transitions.
 
+`expressions.png` has four columns and six rows: sitting, stretching, yawning, dancing, hopping, and tail wagging. Each row contains four distinct transparent poses. The matching state sequences can repeat cells to hold an expression or repeat a movement; `happy` also uses the dancing artwork. These states use painted facial expressions and `"eyes": []`.
+
 `directions.side` and `directions.back` select the other walking views; the default `frames` sequence supplies the front view. All directions share the state's `fps` and frame count. Left-facing side frames are mirrored at render time. Top-level `eyes` contains normalized `[x, y, width, height]` rectangles for procedural eyelids; a state can override it with `"eyes": []` for art with different eye positions. The `canvas` entry documents the idle artwork size. Keep all sprite paths inside the asset directory. The existing Windows build automatically includes the atlas and manifest; rebuild it after changing assets.
 
 To regenerate the native-rendered walking preview with development dependencies installed:
@@ -137,6 +148,7 @@ To regenerate the native-rendered walking preview with development dependencies 
 ```bash
 .venv/bin/python -m scripts.render_walk_preview
 .venv/bin/python -m scripts.render_activity_preview
+.venv/bin/python -m scripts.render_expression_preview
 .venv/bin/python -m scripts.render_ui_preview
 ```
 
@@ -146,8 +158,10 @@ To regenerate the native-rendered walking preview with development dependencies 
 desktop_pet/
   app.py       Application lifecycle, tray, focus timer, single instance
   activities.py Shared activity titles, scenes, colors, and descriptions
+  gestures.py  Shared reaction names and menu choices
   pet.py       Native transparent window, painting, input, movement
   animations.py Configurable clips, frame timing, idle choices, pose transitions
+  rendering.py Shared sprite blending and posing for the pet and portrait
   model.py     Roaming motion and offline responses
   panel.py     Responsive native panel, activity tiles, chat, settings gear
   chat_widgets.py Native message bubbles, avatars, timestamps, chat scrolling
@@ -168,6 +182,7 @@ Biscuit.spec   Windows portable packaging configuration
 - Click, drag, double-click, sleep, hide, summon, and quit work.
 - Enable Explore desktop; verify front/back/side walking frames, left/right mirroring, and turns at all screen edges.
 - Try every activity tile and its matching tray action. Verify the laptop timer, greeting return, curled nap, mouse following, and Rest here controls.
+- Play all six reactions from the panel and tray. Confirm the current activity resumes, the Work timer continues, and rapid changes blend smoothly.
 - Open Preferences using the small gear and Ctrl+,. Save settings, close with Escape, and confirm the pet continues running. Check chat and the composer at small and large window sizes.
 - Enable click-through; recover using the tray menu.
 - Drag across differently scaled monitors; disconnect a monitor and confirm recovery.

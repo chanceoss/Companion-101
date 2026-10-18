@@ -3,12 +3,14 @@ from PySide6.QtCore import Qt, QRectF, QTimer, Signal, QSize
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QLinearGradient, QPen, QShortcut, QKeySequence
 from PySide6.QtWidgets import (QAbstractButton, QApplication, QFrame, QGridLayout,
     QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QSizePolicy,
-    QToolButton, QVBoxLayout, QWidget, QBoxLayout)
+    QToolButton, QVBoxLayout, QWidget, QBoxLayout, QMenu)
 from .activities import ACTIVITIES, BY_KEY, SCENES
 from .chat_widgets import ChatHistory, ConversationFrame
 from .preferences import PreferencesDialog
 from .theme import garden, icon, load_fonts, paw, sparkle, ui_font
 from .animations import Animator
+from .gestures import GESTURES
+from .rendering import draw_character
 
 STYLE = """
 QWidget {color: #674c3d; font-family: 'Nunito'; font-size: 15px;}
@@ -154,6 +156,8 @@ class Portrait(QAbstractButton):
         self.setToolTip("Click to give a little love")
         self.setFocusPolicy(Qt.StrongFocus)
         self.activity = "idle"
+        self.gesture = None
+        self._paused_elapsed = 0
         self.animator = Animator(library=sprites.animation_library)
         self.pose = self.animator.advance(0)
         self.timer = QTimer(self)
@@ -167,11 +171,25 @@ class Portrait(QAbstractButton):
 
     def animate(self):
         self.pose = self.animator.advance(.05)
+        if self.gesture and self.animator.state != self.gesture:
+            self.gesture = None
+            self.animator.set_state(SCENES[self.activity])
+            if self.activity == "greet":
+                self.animator.elapsed = self._paused_elapsed
+            self.pose = self.animator.advance(0)
         self.update()
 
     def set_activity(self, activity):
         self.activity = activity
+        self.gesture = None
         self.animator.set_state(SCENES[activity])
+        self.update()
+
+    def perform_gesture(self, state):
+        if not self.gesture:
+            self._paused_elapsed = self.animator.elapsed
+        self.gesture = state
+        self.animator.set_state(state, restart=True)
         self.update()
 
     def paintEvent(self, event):
@@ -190,14 +208,8 @@ class Portrait(QAbstractButton):
         p.drawEllipse(QRectF(self.width() / 2 - 68, self.height() - 18, 136, 11))
         w = min(self.width() - 8, 225)
         p.save()
-        p.translate(self.width() / 2, self.height() - 12 + self.pose.bob * w / 255)
-        p.rotate(self.pose.rotation)
-        p.scale(self.pose.sx, self.pose.sy)
-        for state, elapsed, opacity in self.animator.layers():
-            sprite = self.sprites.frame(state, elapsed)
-            h = w * sprite.height() / sprite.width()
-            p.setOpacity(self.pose.opacity * opacity)
-            p.drawPixmap(QRectF(-w / 2, -h, w, h), sprite, QRectF(sprite.rect()))
+        p.translate(self.width() / 2, self.height() - 12)
+        draw_character(p, self.sprites, self.animator, self.pose, w)
         p.restore()
         garden(p, QRectF(0, self.height() - 22, self.width(), 22), corner=True)
         if self.hasFocus():
@@ -217,6 +229,7 @@ class ControlPanel(QWidget):
     focus_requested = Signal()
     quit_requested = Signal()
     activity_requested = Signal(str)
+    gesture_requested = Signal(str)
 
     def __init__(self, settings, sprites, companion):
         super().__init__()
@@ -367,6 +380,21 @@ class ControlPanel(QWidget):
         heading.addWidget(chat_icon)
         heading.addWidget(label("Chat", "chatTitle"))
         heading.addStretch()
+        self.gesture_button = QToolButton()
+        self.gesture_button.setText("Reactions")
+        self.gesture_button.setIcon(icon("paw", "#b88042", 18))
+        self.gesture_button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.gesture_button.setAccessibleName("Biscuit reactions")
+        self.gesture_button.setToolTip("A little stretch, a dance, or a tail wag")
+        self.gesture_button.setPopupMode(QToolButton.InstantPopup)
+        self.gesture_menu = QMenu(self.gesture_button)
+        self.gesture_actions = {}
+        for state, title in GESTURES:
+            action = self.gesture_menu.addAction(title)
+            action.triggered.connect(lambda checked=False, key=state: self.gesture_requested.emit(key))
+            self.gesture_actions[state] = action
+        self.gesture_button.setMenu(self.gesture_menu)
+        heading.addWidget(self.gesture_button)
         self.clear_button = QToolButton()
         self.clear_button.setIcon(icon("clear", "#bca28b", 19))
         self.clear_button.setAccessibleName("Clear conversation")
@@ -508,6 +536,9 @@ class ControlPanel(QWidget):
         self.portrait.set_activity(key)
         self.sleep_button.setText("Wake" if key == "nap" else "Nap")
         self.sleep_button.setAccessibleName("Wake up" if key == "nap" else "Take a nap")
+
+    def perform_gesture(self, state):
+        self.portrait.perform_gesture(state)
 
     def set_focus_remaining(self, seconds):
         self.focus.setVisible(seconds is not None)
