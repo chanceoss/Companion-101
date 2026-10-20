@@ -1,11 +1,23 @@
 """The former Preferences tab, now opened by the compact gear button."""
 import sys
+from copy import deepcopy
 from PySide6.QtCore import Qt, Signal, QEvent
 from PySide6.QtWidgets import (QCheckBox, QDialog, QFormLayout, QHBoxLayout, QLabel,
                                QLineEdit, QPushButton, QScrollArea, QSlider,
-                               QVBoxLayout, QWidget, QLayout)
+                               QVBoxLayout, QWidget, QLayout, QComboBox, QSpinBox,
+                               QDoubleSpinBox)
 from .storage import startup_enabled, set_startup
 from .ai import validate_endpoint
+from .providers import PRESETS, ProviderDiscovery, provider_id
+
+
+class ProviderSelector(QComboBox):
+    """The former enable checkbox API remains compatible with existing callers."""
+    def isChecked(self):
+        return self.currentData() != 'offline'
+
+    def setChecked(self, checked):
+        self.setCurrentIndex(self.findData('custom' if checked else 'offline'))
 
 
 class PreferencesDialog(QDialog):
@@ -75,8 +87,10 @@ class PreferencesDialog(QDialog):
         note.setObjectName("hint")
         note.setWordWrap(True)
         layout.addWidget(note)
-        self.provider = QCheckBox("Use an OpenAI-compatible AI provider")
-        self.provider.setChecked(settings.get("provider"))
+        self.provider = ProviderSelector()
+        for key, (title, _, _) in PRESETS.items():
+            self.provider.addItem(title, key)
+        self.provider.setCurrentIndex(self.provider.findData(provider_id(settings)))
         layout.addWidget(self.provider)
         ai_form = QFormLayout()
         ai_form.setSpacing(12)
@@ -89,6 +103,39 @@ class PreferencesDialog(QDialog):
         ai_form.addRow("Model", self.model)
         ai_form.addRow("API key", self.key)
         layout.addLayout(ai_form)
+        discovery_row = QHBoxLayout()
+        self.model_choices = QComboBox()
+        self.model_choices.setMinimumContentsLength(12)
+        self.model_choices.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.model_choices.setPlaceholderText('Discover models first')
+        self.model_choices.textActivated.connect(self.model.setText)
+        discovery_row.addWidget(self.model_choices, 1)
+        self.test_ai_button = QPushButton('Test / models')
+        self.test_ai_button.setAutoDefault(False)
+        discovery_row.addWidget(self.test_ai_button)
+        layout.addLayout(discovery_row)
+        self.share_context = QCheckBox('Include earlier chat with this connection (may send it to a new provider)')
+        self.share_context.setChecked(False)
+        layout.addWidget(self.share_context)
+        self.fallback = QCheckBox('Use a clearly labeled offline reply if AI fails')
+        self.fallback.setChecked(settings.get('ai_fallback'))
+        layout.addWidget(self.fallback)
+        response_form = QFormLayout()
+        self.max_tokens = QSpinBox()
+        self.max_tokens.setRange(32, 4096)
+        self.max_tokens.setValue(settings.get('ai_max_tokens'))
+        self.temperature = QDoubleSpinBox()
+        self.temperature.setRange(0, 2)
+        self.temperature.setSingleStep(.1)
+        self.temperature.setValue(settings.get('ai_temperature'))
+        self.daily_limit = QSpinBox()
+        self.daily_limit.setRange(0, 10000)
+        self.daily_limit.setSpecialValueText('No app limit')
+        self.daily_limit.setValue(settings.get('ai_daily_limit'))
+        response_form.addRow('Reply tokens', self.max_tokens)
+        response_form.addRow('Creativity', self.temperature)
+        response_form.addRow('Cloud messages / day', self.daily_limit)
+        layout.addLayout(response_form)
         self.remember = QCheckBox("Remember key in the operating system’s credential store")
         self.remember.setChecked(companion.remember_key)
         self._saved_key = companion.key
@@ -106,6 +153,15 @@ class PreferencesDialog(QDialog):
         self.ai_status.setObjectName("hint")
         self.ai_status.setWordWrap(True)
         layout.addWidget(self.ai_status)
+        self.discovery = ProviderDiscovery(self)
+        self.discovery.status.connect(self.ai_status.setText)
+        self.discovery.models_found.connect(self.set_models)
+        self.test_ai_button.clicked.connect(lambda: self.discovery.discover(
+            self.provider.currentData(), self.endpoint.text(), self.key.text()))
+        self._profiles = deepcopy(settings.get('provider_profiles'))
+        self._selection = self.provider.currentData()
+        self._credential_drafts = {self._selection: (companion.key, companion.remember_key)}
+        self.provider.currentIndexChanged.connect(self.choose_provider)
         self.ai_fields = (self.endpoint, self.model, self.key)
         for field in self.ai_fields:
             field.installEventFilter(self)
@@ -147,6 +203,7 @@ class PreferencesDialog(QDialog):
 
     def save_ai(self):
         enabled = self.provider.isChecked()
+        selected = self.provider.currentData()
         endpoint, model = self.endpoint.text().strip().rstrip("/"), self.model.text().strip()
         key, remember = self.key.text().strip(), self.remember.isChecked()
         try:
@@ -157,16 +214,68 @@ class PreferencesDialog(QDialog):
                 validate_endpoint(endpoint)
             changed = (enabled != self.settings.get("provider") or endpoint != self.settings.get("endpoint")
                        or model != self.settings.get("model") or key != self._saved_key)
-            self.settings.update(provider=enabled, endpoint=endpoint, model=model)
+            if selected == 'groq' and enabled and not key:
+                raise ValueError('Enter your own Groq API key before enabling Groq.')
+            if selected != 'offline':
+                self._profiles[selected] = {'endpoint': endpoint, 'model': model}
+            previous_provider = self.settings.get('ai_provider')
+            self.settings.update(provider=enabled, ai_provider=selected, endpoint=endpoint, model=model,
+                                 provider_profiles=deepcopy(self._profiles), ai_fallback=self.fallback.isChecked(),
+                                 ai_max_tokens=self.max_tokens.value(), ai_temperature=self.temperature.value(),
+                                 ai_daily_limit=self.daily_limit.value())
             if changed:
                 self.companion.cancel_pending()
-            if key != self._saved_key or remember != self._saved_remember:
+            if selected != 'offline':
+                self.companion.select_provider(selected)
+            self.companion.select_context(endpoint, self.share_context.isChecked())
+            if selected != 'offline' and (previous_provider != selected or key != self._saved_key or remember != self._saved_remember):
                 self.companion.save_key(key, remember)
             self._saved_key, self._saved_remember = key, remember
+            self.share_context.setChecked(False)
             self.ai_status.setText("AI connection saved. Your completed conversation is unchanged.")
         except (OSError, RuntimeError, ValueError) as exc:
             self.ai_status.setText(str(exc))
         self.saved.emit()
+
+    def set_models(self, models):
+        self.model_choices.clear()
+        self.model_choices.addItems(models)
+        if not self.model.text() and models:
+            self.model.setText(models[0])
+
+    def choose_provider(self):
+        old, selected = self._selection, self.provider.currentData()
+        if old != 'offline':
+            self._profiles[old] = {'endpoint': self.endpoint.text(), 'model': self.model.text()}
+            self._credential_drafts[old] = (self.key.text(), self.remember.isChecked())
+        self._selection = selected
+        self.share_context.setChecked(False)
+        self.model_choices.clear()
+        profile = self._profiles.get(selected)
+        if profile or selected in ('ollama', 'groq'):
+            _, base, model = PRESETS[selected]
+            self.endpoint.setText(profile.get('endpoint', base) if profile else base)
+            self.model.setText(profile.get('model', model) if profile else model)
+        if selected in self._credential_drafts:
+            key, remember = self._credential_drafts[selected]
+        elif selected == 'custom' and old == 'offline':
+            key, remember = self.companion.key, self.companion.remember_key
+        else:
+            try:
+                import keyring
+                account = 'api-key' if selected == 'custom' else 'api-key-' + selected
+                key = keyring.get_password('BiscuitCompanion', account) or ''
+            except Exception:
+                key = ''
+            remember = bool(key)
+        self.key.setText(key)
+        self.remember.setChecked(remember)
+        self.ai_status.setText('Offline · no AI requests.' if selected == 'offline' else
+                               'Local processing through Ollama. No models are downloaded by Biscuit.' if selected == 'ollama' else
+                               'Internet required. New messages go to this provider; earlier chat is excluded unless you opt in above.')
+
+    def shutdown(self):
+        self.discovery.shutdown()
 
     def eventFilter(self, source, event):
         if source in self.ai_fields and event.type() == QEvent.KeyPress and event.key() in (Qt.Key_Return, Qt.Key_Enter):

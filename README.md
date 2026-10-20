@@ -83,11 +83,13 @@ The regular desktop always-on-top setting does not place the pet over Windows se
 
 ## Offline and optional AI chat
 
+Biscuit now supports **Ollama**, **Groq**, and custom OpenAI-compatible providers, with model discovery, connection testing, separate credentials, and optional offline fallback. See the [integration setup and privacy guide](docs/integrations.md) for provider setup, context-sharing choices, costs, and service terms.
+
 **Offline is the default.** It provides friendly, clearly identified preset replies with no network traffic. The pet animation and desktop features do not require an API key.
 
 For open-ended AI conversation:
 
-1. Click the **upper-right gear** to open **Preferences**, then enable **Use an OpenAI-compatible AI provider**.
+1. Click the **upper-right gear** to open **Preferences**, then choose Ollama, Groq, or Custom from the AI provider selector.
 2. Enter a base URL (for example, `https://api.openai.com/v1`), a model supported by your account, and your API key. The default model is `gpt-4o-mini`; availability depends on the provider/account.
 3. Choose whether to remember the key, then **Save AI connection**. Pressing Enter in a URL, model, or key field also saves only the AI connection.
 
@@ -95,7 +97,7 @@ URL and model are required only when enabling AI. With AI disabled, they can be 
 
 An OpenAI-compatible local server can use a base URL such as `http://localhost:1234/v1` and its local model ID, with an empty key if the server permits. Remote endpoints require HTTPS. TLS verification remains enabled, and API redirects are rejected so credentials are not forwarded to another destination. Requests run asynchronously with a 45-second transfer timeout, leaving the pet responsive. Errors appear in chat without exposing provider response bodies.
 
-AI mode sends your message, a companion personality prompt, and up to 20 recent conversation messages to the configured provider. There is no screen capture, microphone recording, file access, or desktop automation. Conversation history is held in memory only. The trash button labeled **Clear conversation** explicitly discards both the visible chat and AI context. Saving preferences keeps both. Changing the AI connection cancels an unfinished request while retaining completed messages; an unchanged save leaves the request running. Subsequent AI messages use the retained context with the selected provider. Provider fees and connectivity are your responsibility.
+AI mode sends your message, a companion personality prompt, and up to 20 recent conversation messages authorized for that connection. Conversation history is held in memory only. The trash button labeled **Clear conversation** explicitly discards both the visible chat and AI context. Saving preferences keeps both. Changing the AI connection cancels an unfinished request while retaining completed messages; an unchanged save leaves the request running. A changed endpoint starts with new context unless you explicitly choose to include earlier chat. Provider fees and connectivity are your responsibility.
 
 The API key is held in memory, or saved with `keyring` to **Windows Credential Manager** if you choose to remember it. It never goes in `settings.json`. Uncheck the remember option and save to remove the stored key. If secure storage is unavailable, the app reports that the key is session-only. Nonsecret preferences use Qt's application-data location (typically `%LOCALAPPDATA%\Companion101\BiscuitCompanion`). Windows startup uses the current user's `Run` registry key; disable it in Preferences before moving/removing the app. No administrator rights are required.
 

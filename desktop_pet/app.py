@@ -232,6 +232,7 @@ class Application:
         self.hello_timer.stop()
         self.focus_timer.stop()
         self.companion.shutdown()
+        self.panel.preferences.shutdown()
         self.pet.timer.stop()
         self.pet.bubble.hide()
         self.tray.hide()

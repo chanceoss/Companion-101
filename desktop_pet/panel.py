@@ -419,6 +419,13 @@ class ControlPanel(QWidget):
         self.thinking = label("", "hint")
         self.thinking.hide()
         rows.addWidget(self.thinking)
+        self.fallback_button = button('Use offline reply', self.companion.retry_offline)
+        self.fallback_button.setObjectName('quiet')
+        self.fallback_button.hide()
+        self.companion.fallback_available.connect(lambda text: self.offer_fallback(text))
+        self.companion.notice.connect(lambda text: self.add_message('Connection', text))
+        self.companion.answered.connect(lambda text: self.fallback_button.hide())
+        rows.addWidget(self.fallback_button)
         composer_row = QHBoxLayout()
         composer_row.setSpacing(10)
         composer = QFrame()
@@ -559,6 +566,10 @@ class ControlPanel(QWidget):
             self.input.clear()
             self.add_message("You", message, True)
             self.message_sent.emit(message)
+
+    def offer_fallback(self, text):
+        self.add_message('Connection', text)
+        self.fallback_button.show()
 
     def set_busy(self, busy):
         self.send_button.setEnabled(not busy)

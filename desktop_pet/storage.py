@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 import os
 from pathlib import Path
 import sys
@@ -6,14 +7,16 @@ from PySide6.QtCore import QStandardPaths
 
 DEFAULTS = {"scale": 100, "wander": False, "reminders": False,
             "name": "Biscuit", "provider": False,
-            "endpoint": "https://api.openai.com/v1", "model": "gpt-4o-mini"}
+            "endpoint": "https://api.openai.com/v1", "model": "gpt-4o-mini",
+            "ai_provider": "custom", "provider_profiles": {}, "ai_fallback": False,
+            "ai_max_tokens": 400, "ai_temperature": .7, "ai_daily_limit": 0, "ai_usage": {}}
 
 
 class Settings:
     def __init__(self, directory=None):
         self.directory = Path(directory or QStandardPaths.writableLocation(QStandardPaths.AppLocalDataLocation))
         self.path = self.directory / "settings.json"
-        self.values = DEFAULTS.copy()
+        self.values = deepcopy(DEFAULTS)
         try:
             loaded = json.loads(self.path.read_text(encoding="utf-8"))
             if isinstance(loaded, dict):
@@ -24,7 +27,7 @@ class Settings:
             self.values["scale"] = min(150, max(60, int(self.values["scale"])))
         except (ValueError, TypeError):
             self.values["scale"] = 100
-        for key in ("wander", "reminders", "provider"):
+        for key in ("wander", "reminders", "provider", "ai_fallback"):
             self.values[key] = self.values[key] is True
         for key in ("name", "endpoint", "model"):
             if not isinstance(self.values[key], str):
@@ -32,6 +35,19 @@ class Settings:
         for key in ("x", "y"):
             if key in self.values and not isinstance(self.values[key], int):
                 del self.values[key]
+        if self.values.get('ai_provider') not in ('offline', 'custom', 'ollama', 'groq'):
+            self.values['ai_provider'] = 'custom'
+        if not isinstance(self.values.get('provider_profiles'), dict):
+            self.values['provider_profiles'] = {}
+        for key, minimum, maximum in (('ai_max_tokens', 32, 4096), ('ai_daily_limit', 0, 10000)):
+            try:
+                self.values[key] = min(maximum, max(minimum, int(self.values[key])))
+            except (ValueError, TypeError):
+                self.values[key] = DEFAULTS[key]
+        try:
+            self.values['ai_temperature'] = min(2, max(0, float(self.values['ai_temperature'])))
+        except (ValueError, TypeError):
+            self.values['ai_temperature'] = .7
 
     def get(self, key):
         return self.values.get(key)
