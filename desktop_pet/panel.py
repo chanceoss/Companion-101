@@ -231,6 +231,8 @@ class ControlPanel(QWidget):
     activity_requested = Signal(str)
     gesture_requested = Signal(str)
     tools_requested = Signal(str)
+    microphone_requested = Signal()
+    mute_requested = Signal(bool)
 
     def __init__(self, settings, sprites, companion):
         super().__init__()
@@ -406,6 +408,15 @@ class ControlPanel(QWidget):
             self.gesture_actions[state] = action
         self.gesture_button.setMenu(self.gesture_menu)
         heading.addWidget(self.gesture_button)
+        self.mute_button = QToolButton()
+        self.mute_button.setText('Sound')
+        self.mute_button.setCheckable(True)
+        self.mute_button.setChecked(not self.settings.get('voice_muted'))
+        self.mute_button.setToolTip('Toggle spoken replies')
+        self.mute_button.setAccessibleName('Mute or unmute Biscuit')
+        self.mute_button.toggled.connect(lambda enabled: self.mute_requested.emit(not enabled))
+        self.mute_button.hide()
+        heading.addWidget(self.mute_button)
         self.clear_button = QToolButton()
         self.clear_button.setIcon(icon("clear", "#bca28b", 19))
         self.clear_button.setAccessibleName("Clear conversation")
@@ -430,6 +441,10 @@ class ControlPanel(QWidget):
         self.thinking = label("", "hint")
         self.thinking.hide()
         rows.addWidget(self.thinking)
+        self.voice_status = label('', 'hint')
+        self.voice_status.setWordWrap(True)
+        self.voice_status.hide()
+        rows.addWidget(self.voice_status)
         self.fallback_button = button('Use offline reply', self.companion.retry_offline)
         self.fallback_button.setObjectName('quiet')
         self.fallback_button.hide()
@@ -450,10 +465,12 @@ class ControlPanel(QWidget):
         self.input.setMaxLength(4000)
         self.input.returnPressed.connect(self.send)
         composer_layout.addWidget(self.input, 1)
-        stamp = QLabel()
-        stamp.setPixmap(icon("paw", "#e2ab6e", 22).pixmap(22, 22))
-        stamp.setAttribute(Qt.WA_TransparentForMouseEvents)
-        composer_layout.addWidget(stamp)
+        self.microphone_button = QToolButton()
+        self.microphone_button.setText('Mic')
+        self.microphone_button.setAccessibleName('Start or stop voice recording')
+        self.microphone_button.setToolTip('Click to record; click again to stop. Review text before sending.')
+        self.microphone_button.clicked.connect(self.microphone_requested.emit)
+        composer_layout.addWidget(self.microphone_button)
         composer_row.addWidget(composer, 1)
         self.send_button = button("Send ↗", self.send, True)
         self.send_button.setFixedSize(92, 52)
@@ -586,6 +603,13 @@ class ControlPanel(QWidget):
         action = self.tools_menu.addAction(title)
         action.triggered.connect(lambda checked=False: self.tools_requested.emit(key))
         self.tool_actions[key] = action
+
+    def set_voice_status(self, text):
+        self.voice_status.setText(text)
+        self.voice_status.setVisible(bool(text))
+
+    def set_listening(self, listening):
+        self.microphone_button.setText('Stop' if listening else 'Mic')
 
     def set_busy(self, busy):
         self.send_button.setEnabled(not busy)

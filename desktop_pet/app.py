@@ -6,7 +6,7 @@ import time
 from PySide6.QtCore import Qt, QTimer, QStandardPaths, QLockFile
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
-from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
+from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon, QFileDialog
 from .ai import Companion
 from .panel import ControlPanel
 from .pet import PetWindow
@@ -16,6 +16,8 @@ from .gestures import GESTURES
 from .services.weather import WeatherService
 from .services.system_monitor import SystemMonitor
 from .tools import ToolsDialog
+from .services.voice import VoiceService
+from .services.speech_recognition import SpeechRecognition
 
 
 class Application:
@@ -30,12 +32,25 @@ class Application:
         self.panel = ControlPanel(self.settings, self.sprites, self.companion)
         self.weather = WeatherService(self.settings)
         self.system_monitor = SystemMonitor(self.settings)
+        self.voice = VoiceService(self.settings)
+        self.recognition = SpeechRecognition(self.settings)
         self.tools = ToolsDialog(self.settings, self.weather, self.system_monitor, self.panel)
         self.panel.tools_requested.connect(self.tools.open_page)
         self.panel.preferences_saved.connect(self.apply_services)
         self.tools.location_chosen.connect(self.choose_location)
         self.weather.updated.connect(self.weather_reaction)
         self.system_monitor.notification.connect(self.ambient_notice)
+        self.tools.add_voice(self.voice, self.recognition)
+        self.panel.add_tool('voice', 'Voice')
+        self.panel.microphone_requested.connect(self.recognition.toggle)
+        self.recognition.listening.connect(self.panel.set_listening)
+        self.recognition.status.connect(self.panel.set_voice_status)
+        self.recognition.transcribed.connect(self.review_transcription)
+        self.voice.status.connect(self.panel.set_voice_status)
+        self.voice.speaking.connect(self.speech_reaction)
+        self.voice.downloaded.connect(self.model_downloaded)
+        self.panel.mute_requested.connect(self.set_muted)
+        self.panel.preferences.features.download_requested.connect(self.download_model)
         self.icon = QIcon(str(ASSETS / "biscuit.png"))
         app.setWindowIcon(self.icon)
         self.panel.setWindowIcon(self.icon)
@@ -109,6 +124,43 @@ class Application:
     def apply_services(self):
         self.weather.apply_settings()
         self.system_monitor.apply_settings()
+        self.voice.apply_settings()
+        if self.settings.get('voice_mode') != 'ptt':
+            self.recognition.cancel()
+        self.panel.mute_button.setVisible(self.settings.get('voice_mode') in ('spoken','ptt'))
+        self.panel.mute_button.blockSignals(True)
+        self.panel.mute_button.setChecked(not self.settings.get('voice_muted'))
+        self.panel.mute_button.blockSignals(False)
+
+    def review_transcription(self, text):
+        previous = self.panel.input.text().strip()
+        self.panel.input.setText((previous + ' ' + text).strip())
+        self.panel.input.setFocus()
+
+    def set_muted(self, muted):
+        self.settings.update(voice_muted=muted)
+        self.panel.preferences.features.controls['voice_muted'].setChecked(muted)
+        self.voice.apply_settings()
+
+    def speech_reaction(self, speaking):
+        if (speaking and self.pet.activity == 'idle' and not self.pet.gesture and
+                self.focus_deadline is None and self.pet.isVisible()):
+            self.perform_gesture('tail_wag')
+
+    def download_model(self, kind):
+        directory = QFileDialog.getExistingDirectory(self.panel.preferences, 'Choose a model download folder')
+        if not directory:
+            return
+        detail = ('Piper en_US-lessac-medium voice plus configuration/model card (roughly 60 MB). Review the voice license at huggingface.co/rhasspy/piper-voices.'
+                  if kind == 'piper' else 'Multilingual Faster Whisper tiny (roughly 75 MB). Larger models can be installed manually for better Tagalog accuracy.')
+        answer = QMessageBox.question(self.panel.preferences, 'Download optional local model?',
+            detail + '\n\nDownloads from Hugging Face to the selected folder. Optional speech packages must be installed. Continue?')
+        if answer == QMessageBox.Yes:
+            self.voice.download(kind, directory)
+
+    def model_downloaded(self, kind, path):
+        key = 'piper_model' if kind == 'piper' else 'whisper_model'
+        self.panel.preferences.features.controls[key].setText(path)
 
     def choose_location(self, place):
         self.settings.update(weather_city=place['name'], weather_latitude=place['latitude'],
@@ -240,6 +292,7 @@ class Application:
     def answer(self, message):
         self.panel.add_message(self.settings.get("name"), message)
         self.pet.say(message)
+        self.voice.speak(message)
         if (self.pet.activity != "nap" and not self.pet.gesture
                 and self.pet.animator.state not in ("sleeping", "leaving", "dragged")):
             self.pet.set_state("happy")
@@ -273,6 +326,8 @@ class Application:
         self.companion.shutdown()
         self.weather.shutdown()
         self.system_monitor.shutdown()
+        self.recognition.shutdown()
+        self.voice.shutdown()
         self.tools.hide()
         self.panel.preferences.shutdown()
         self.pet.timer.stop()

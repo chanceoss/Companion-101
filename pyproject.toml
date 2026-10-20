@@ -16,7 +16,7 @@ system = ["psutil>=5.9,<8"]
 biscuit = "desktop_pet.app:main"
 
 [tool.setuptools.package-data]
-desktop_pet = ["assets/*.png", "assets/*.json", "assets/fonts/*.ttf", "assets/fonts/*.txt"]
+desktop_pet = ["assets/*.png", "assets/*.json", "assets/*.py", "assets/fonts/*.ttf", "assets/fonts/*.txt"]
 
 [tool.setuptools.packages.find]
 include = ["desktop_pet*"]

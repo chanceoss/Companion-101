@@ -38,3 +38,21 @@ Use **Tools → Weather** to search for a city and explicitly select it. This en
 Optional weather reactions use existing Biscuit animations and do not interrupt Work, dragging, greeting, or another reaction. They are off by default. Open-Meteo's public free service is for **non-commercial use**; review its commercial terms before distributing a commercial service. Weather data attribution is Open-Meteo / CC BY 4.0.
 
 Enable read-only monitoring in the gear's System group, then open **Tools → System status**. Install the optional extra with `python -m pip install ".[system]"` for psutil CPU/RAM/battery values. It samples every 30 seconds without examining processes or application contents. On Windows, a supported power-status API can supply battery information when psutil is unavailable. Desktop PCs without batteries are handled normally. Optional low-battery/charging notices are edge-triggered and throttled; focus sessions suppress them. Nothing is uploaded. These Windows power/tray behaviors still require native Windows verification.
+
+## Local voice: Piper and Faster Whisper
+
+Voice is **off by default**. It never starts a microphone automatically. Text, local reminders, animations, and chat continue working with no speech packages installed.
+
+Create a separate Python 3.12 environment and install `requirements-voice.txt`. In the gear's Voice group, select that environment's Python executable (`voice-env\Scripts\python.exe` on Windows). A packaged Biscuit executable also uses this external environment; heavy speech libraries/models are intentionally not built into the small default bundle. Piper is GPL-3.0 and each voice has its own model license. Review them before distributing speech environments or voices; the app does not bundle Piper.
+
+Choose one of:
+
+- **Text only:** no speech inference or playback; Mic explains how to enable voice.
+- **Text + spoken replies:** AI/offline responses are synthesized locally with Piper and played through Qt.
+- **Push-to-talk + spoken replies:** click Mic to begin, then Stop to transcribe. Recording stops after 60 seconds or the memory limit. Review/edit the recognized text and explicitly press Send. Auto-detect, English, and Filipino/Tagalog are supported by multilingual Whisper models; accuracy depends on the model, accent, noise, and hardware.
+
+Choose a local Piper `.onnx` file with its adjacent `.onnx.json`, and a local Faster Whisper model directory containing `model.bin`. You can import existing models without downloading anything. **Download Piper voice…** offers `en_US-lessac-medium`; **Download Whisper tiny…** offers the multilingual tiny model. Each asks for a destination and explicit confirmation before contacting Hugging Face. Model sizes are approximate (Piper roughly 60 MB, Whisper tiny roughly 75 MB) and may change. Tiny prioritizes CPU size/speed; install a larger multilingual model manually if you need better Tagalog recognition. Downloaded files are reused; normal transcription passes `local_files_only=True` and never downloads a model.
+
+Change speech speed, volume, voice, input device, and language in the Voice group. **Sound** mutes/unmutes replies; **Tools → Voice** provides sample speech and a stop/cancel action for playback, recording, inference, and downloads. Generating speech/transcribing/downloading runs in cancellable worker processes and does not freeze the Qt event loop. While speaking, a resting Biscuit can wag its tail without disturbing Work.
+
+Microphone PCM stays in memory and is passed to the local worker through pipes. Recordings are not written to disk. Synthesized reply audio uses a temporary WAV removed on shutdown. Recognized text is not sent to AI until you press Send. Device/permission/model errors are shown without exposing transcripts in logs. Actual microphone capture, speakers, Piper voices, and Whisper inference still need validation with your installed models and Windows audio devices; automated tests exercise the pipeline and local-processing constraints with mocked backends.

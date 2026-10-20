@@ -12,7 +12,10 @@ DEFAULTS = {"scale": 100, "wander": False, "reminders": False,
             "ai_max_tokens": 400, "ai_temperature": .7, "ai_daily_limit": 0, "ai_usage": {},
             "weather_enabled": False, "weather_reactions": False, "weather_interval": 30,
             "weather_latitude": None, "weather_longitude": None, "weather_city": "",
-            "system_enabled": False, "battery_notifications": False, "notifications": True}
+            "system_enabled": False, "battery_notifications": False, "notifications": True,
+            "voice_mode": "text", "voice_muted": False, "voice_volume": 70, "voice_speed": 1.0,
+            "voice_python": "", "piper_model": "", "whisper_model": "", "voice_language": "",
+            "microphone_device": ""}
 
 
 class Settings:
@@ -31,7 +34,7 @@ class Settings:
         except (ValueError, TypeError):
             self.values["scale"] = 100
         for key in ("wander", "reminders", "provider", "ai_fallback", "weather_enabled", "weather_reactions",
-                    "system_enabled", "battery_notifications", "notifications"):
+                    "system_enabled", "battery_notifications", "notifications", "voice_muted"):
             self.values[key] = self.values[key] is True
         for key in ("name", "endpoint", "model"):
             if not isinstance(self.values[key], str):

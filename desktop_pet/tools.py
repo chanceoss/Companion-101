@@ -76,3 +76,15 @@ class ToolsDialog(QDialog):
         lines.append(f"Battery: {battery['percent']:.0f}% · {'charging' if battery['charging'] else 'on battery'}" if battery else 'Battery: unavailable / desktop PC')
         if data.get('note'): lines.append(data['note'])
         self.system_summary.setText('\n'.join(lines))
+
+    def add_voice(self,voice,recognition):
+        page=QWidget();rows=QVBoxLayout(page)
+        note=QLabel('Configure local voices, speech Python, and microphone mode in Preferences. Nothing listens until you click Mic.')
+        note.setWordWrap(True);rows.addWidget(note)
+        status=QLabel('Text only by default');status.setWordWrap(True);rows.addWidget(status)
+        voice.status.connect(status.setText);recognition.status.connect(status.setText)
+        sample=QPushButton('Speak a sample');sample.clicked.connect(lambda:voice.speak('Hi, I’m Biscuit. A little company for your day.'))
+        rows.addWidget(sample)
+        stop=QPushButton('Stop speech / recording / download')
+        stop.clicked.connect(lambda:(voice.stop(),recognition.cancel(),voice.download_job.cancel(),status.setText('Stopped.')))
+        rows.addWidget(stop);rows.addStretch();self.add_page('voice','Voice',page)
