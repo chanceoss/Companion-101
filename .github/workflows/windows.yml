@@ -15,6 +15,7 @@ jobs:
           python-version: '3.12'
           cache: pip
       - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pip install -r requirements-integrations.txt
       - name: Test native widgets and companion behavior
         run: python -m pytest -q
         env:
@@ -27,6 +28,10 @@ jobs:
           $process = Start-Process -FilePath dist/Biscuit/Biscuit.exe -ArgumentList '--smoke-test' -PassThru
           if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'Smoke test timed out' }
           if ($process.ExitCode -ne 0) { throw "Smoke test failed: $($process.ExitCode)" }
+        env:
+          QT_QPA_PLATFORM: offscreen
+      - name: Test packaged integration workers
+        run: python scripts/check_packaged_workers.py dist/Biscuit/Biscuit.exe
         env:
           QT_QPA_PLATFORM: offscreen
       - name: Bundle Windows app

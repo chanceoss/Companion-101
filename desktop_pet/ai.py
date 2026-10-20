@@ -6,19 +6,21 @@ from urllib.parse import urlparse
 from PySide6.QtCore import QObject, Signal, QUrl
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 from .model import offline_reply
+from .secrets import get_secret, put_secret, delete_secret
 
 
 def validate_endpoint(base):
     try:
         parsed = urlparse(base.strip())
-        if parsed.scheme != "https" and not (parsed.scheme == "http" and parsed.hostname in ("localhost", "127.0.0.1", "::1")):
-            raise ValueError("Use an HTTPS API address, or HTTP for a local model on localhost.")
-        if (not parsed.hostname or any(c.isspace() for c in parsed.hostname)
-                or parsed.username or parsed.password or parsed.query or parsed.fragment):
-            raise ValueError("Enter a base API URL without credentials, query parameters, or fragments.")
+        hostname = parsed.hostname
         _ = parsed.port
-    except ValueError as exc:
-        raise ValueError(str(exc)) from None
+    except (ValueError, AttributeError):
+        raise ValueError('Enter a valid API address and port without embedded credentials.') from None
+    if parsed.scheme != "https" and not (parsed.scheme == "http" and hostname in ("localhost", "127.0.0.1", "::1")):
+        raise ValueError("Use an HTTPS API address, or HTTP for a local model on localhost.")
+    if (not hostname or any(c.isspace() for c in hostname) or parsed.username is not None
+            or parsed.password is not None or parsed.query or parsed.fragment):
+        raise ValueError("Enter a base API URL without credentials, query parameters, or fragments.")
 
 
 class Companion(QObject):
@@ -40,7 +42,9 @@ class Companion(QObject):
         self._context_route = settings.get('endpoint').rstrip('/')
         self._context_start = 0
         self._failed_message = ''
-        self._cooldown_until = 0
+        self._cooldowns = {}
+        self._request_route = ''
+        self._oversized = False
         self._credential_provider = settings.get('ai_provider') or 'custom'
 
     def credential_account(self):
@@ -63,29 +67,29 @@ class Companion(QObject):
 
     def load_key(self):
         try:
-            import keyring
-            self.key = keyring.get_password("BiscuitCompanion", self.credential_account()) or ""
+            self.key = get_secret(self.credential_account()) or ""
             self.remember_key = bool(self.key)
         except Exception:
             self.key = ""
             self.remember_key = False
 
     def save_key(self, key, remember):
+        if '\r' in key or '\n' in key:
+            raise ValueError('The API key must be on one line.')
         self.key = key.strip()
+        was_stored = self.remember_key
         self.remember_key = False
         try:
-            import keyring
             if remember and self.key:
-                keyring.set_password("BiscuitCompanion", self.credential_account(), self.key)
+                put_secret(self.credential_account(), self.key)
                 self.remember_key = True
-            else:
-                try:
-                    keyring.delete_password("BiscuitCompanion", self.credential_account())
-                except keyring.errors.PasswordDeleteError:
-                    pass
+            elif was_stored:
+                delete_secret(self.credential_account())
         except Exception:
             if remember:
                 raise RuntimeError("Secure credential storage is unavailable. Your key works for this session, but was not saved.") from None
+            self.remember_key = was_stored
+            raise RuntimeError('The stored key could not be removed. Remove it from the operating system credential store or try again.') from None
 
     def send(self, message):
         if self.reply is not None:
@@ -94,7 +98,7 @@ class Companion(QObject):
             self.answered.emit(offline_reply(message, self.settings.get("name")))
             return
         base = self.settings.get("endpoint").strip().rstrip("/")
-        if time.monotonic() < self._cooldown_until:
+        if time.monotonic() < self._cooldowns.get(base, 0):
             self._failure('The provider asked us to wait. Please try again shortly.', message)
             return
         try:
@@ -111,7 +115,11 @@ class Companion(QObject):
             if limit and count >= limit:
                 self._failure('Your daily cloud-message limit has been reached. Local/offline chat remains available.', message)
                 return
-            self.settings.update(ai_usage={'day': date.today().isoformat(), 'count': count + 1})
+            try:
+                self.settings.update(ai_usage={'day': date.today().isoformat(), 'count': count + 1})
+            except OSError:
+                self._failure('The cloud usage counter could not be saved. Try local/offline chat.', message)
+                return
         request = QNetworkRequest(QUrl(base + "/chat/completions"))
         request.setHeader(QNetworkRequest.ContentTypeHeader, "application/json")
         request.setAttribute(QNetworkRequest.RedirectPolicyAttribute, QNetworkRequest.ManualRedirectPolicy)
@@ -125,11 +133,23 @@ class Companion(QObject):
                    "temperature": self.settings.get('ai_temperature')}
         self.busy_changed.emit(True)
         self.reply = self.network.post(request, json.dumps(payload).encode())
+        self._request_route = base
+        self._oversized = False
+        self.reply.setReadBufferSize(2 * 1024 * 1024 + 1)
+        self.reply.readyRead.connect(self._check_size)
         self.reply.finished.connect(self._finished)
+
+    def _check_size(self):
+        if self.reply is not None and self.reply.bytesAvailable() > 2 * 1024 * 1024:
+            self._oversized = True
+            self.reply.abort()
 
     def _finished(self):
         reply, self.reply = self.reply, None
         try:
+            if self._oversized:
+                self._failure('The provider response was too large. Try a shorter reply.', self.pending)
+                return
             status = reply.attribute(QNetworkRequest.HttpStatusCodeAttribute)
             if reply.error() != QNetworkReply.NoError or status != 200:
                 # Do not echo provider bodies, URLs, or headers, which can contain secrets.
@@ -142,7 +162,7 @@ class Companion(QObject):
                         delay = min(300, max(1, int(bytes(reply.rawHeader('Retry-After')) or b'10')))
                     except (ValueError, TypeError):
                         delay = 10
-                    self._cooldown_until = time.monotonic() + delay
+                    self._cooldowns[self._request_route] = time.monotonic() + delay
                 elif status == 404:
                     reason = 'The endpoint or model is unavailable. Discover installed/supported models in Preferences.'
                 elif status:

@@ -7,9 +7,13 @@ if not exist ".venv\Scripts\python.exe" (
 )
 ".venv\Scripts\python.exe" -m pip install -r requirements-dev.txt
 if errorlevel 1 goto :failed
+".venv\Scripts\python.exe" -m pip install -r requirements-integrations.txt
+if errorlevel 1 goto :failed
 ".venv\Scripts\python.exe" -m pytest -q
 if errorlevel 1 goto :failed
 ".venv\Scripts\python.exe" -m PyInstaller --clean --noconfirm Biscuit.spec
+if errorlevel 1 goto :failed
+".venv\Scripts\python.exe" scripts\check_packaged_workers.py dist\Biscuit\Biscuit.exe
 if errorlevel 1 goto :failed
 powershell -NoProfile -Command "Compress-Archive -Path 'dist\Biscuit' -DestinationPath 'dist\Biscuit-Windows-x64.zip' -Force"
 if errorlevel 1 goto :failed

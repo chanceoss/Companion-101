@@ -6,10 +6,12 @@ The included transparent character artwork was generated using the supplied refe
 
 ![Native Qt companion panel rendered during the desktop smoke test](docs/companion.png)
 
+Version **1.1** adds optional Ollama/Groq AI, local voice, weather, reminders/tasks, read-only Google Calendar, Google Tasks, system indicators, and trivia. The existing pet, activities, reactions, chat, startup behavior, and credential storage remain. See the [integration setup and privacy guide](docs/integrations.md) for configuration, costs, permissions, and troubleshooting, and the [upgrade report](docs/upgrade-report.md) for phase results, changed files, and remaining manual checks.
+
 ## Start on Windows
 
 1. Install **Python 3.12 x64** from [python.org](https://www.python.org/downloads/windows/), with the Python launcher enabled.
-2. Download/extract this project into a writable folder.
+2. [Download the project ZIP](https://github.com/chanceoss/Companion-101/archive/refs/heads/main.zip) and extract it into a writable folder.
 3. Double-click **`Start Biscuit.bat`**. On first launch it creates a local virtual environment and installs the pinned dependencies. Internet is needed for this installation, then offline mode works without a connection.
 
 Manual equivalent in PowerShell, from the project directory:
@@ -81,6 +83,22 @@ Movement remains on the current monitor until you drag the pet onto another. Win
 
 The regular desktop always-on-top setting does not place the pet over Windows secure screens or guarantee visibility over exclusive fullscreen games.
 
+## Smart companion tools
+
+Open **Tools** beside the Chat heading. Preferences keeps the same gear and now has a section picker for General, AI, Weather, System, Voice, Reminders/Google, and Mini games.
+
+| Feature | What is available |
+| --- | --- |
+| Local and cloud AI | Ollama discovery, Groq/custom providers, safe context switching, offline fallback |
+| Local voice | Piper replies, explicit microphone start/stop, Faster Whisper transcription reviewed before Send |
+| Weather | User-selected city, current conditions, forecast/rain chance, cached offline results |
+| Productivity | SQLite reminders/tasks, timezone-aware scheduling, optional notifications |
+| Google | Separate OAuth connections; read-only Calendar; confirmed Tasks creation/completion |
+| System | Optional local CPU/RAM/battery indicators and gentle battery notices |
+| Mini games | Offline trivia/daily challenge, optional Open Trivia DB questions, local scores |
+
+For source installs, `python -m pip install -r requirements-integrations.txt` adds the small Google/system dependencies. Voice uses the separate `requirements-voice.txt` environment and approved model downloads. No integration is enabled automatically. See the [setup, privacy, costs, and troubleshooting guide](docs/integrations.md).
+
 ## Offline and optional AI chat
 
 Biscuit now supports **Ollama**, **Groq**, and custom OpenAI-compatible providers, with model discovery, connection testing, separate credentials, and optional offline fallback. See the [integration setup and privacy guide](docs/integrations.md) for provider setup, context-sharing choices, costs, and service terms.
@@ -90,7 +108,7 @@ Biscuit now supports **Ollama**, **Groq**, and custom OpenAI-compatible provider
 For open-ended AI conversation:
 
 1. Click the **upper-right gear** to open **Preferences**, then choose Ollama, Groq, or Custom from the AI provider selector.
-2. Enter a base URL (for example, `https://api.openai.com/v1`), a model supported by your account, and your API key. The default model is `gpt-4o-mini`; availability depends on the provider/account.
+2. Enter a base URL and click **Test / models** to discover installed/supported model IDs. Ollama defaults to `http://localhost:11434/v1`; Groq uses its OpenAI-compatible endpoint. Custom keeps the legacy `gpt-4o-mini` default; availability depends on the provider/account. Cloud providers use your own API key.
 3. Choose whether to remember the key, then **Save AI connection**. Pressing Enter in a URL, model, or key field also saves only the AI connection.
 
 URL and model are required only when enabling AI. With AI disabled, they can be empty. A supplied URL is validated before saving. General companion preferences can be saved even while AI fields are incomplete.
@@ -110,9 +128,11 @@ dist/Biscuit/Biscuit.exe
 dist/Biscuit-Windows-x64.zip
 ```
 
-Distribute the **entire Biscuit folder** or the ZIP, not just the executable. The portable app does not require a separate Python installation. It is an unsigned build; a signed commercial release requires your own Windows signing certificate and release process.
+Distribute the **entire Biscuit folder** or the ZIP, not just the executable. The core pet and included small system/Google adapters do not need a separate Python installation. Optional Piper/Faster Whisper voice uses a separately configured Python environment and user-approved models. The build excludes those heavy speech libraries and includes their worker scripts, timezone data, and small integration dependencies. It tests packaged JSON workers before creating the ZIP. The executable is unsigned; signing requires your own Windows certificate and release process.
 
 The included GitHub Actions workflow also tests, builds, smoke-tests, and uploads the Windows ZIP when the repository is pushed or the workflow is manually run. This workflow has been supplied, not executed from the Linux cloud workspace. PyInstaller cannot cross-compile a Windows `.exe` on Linux.
+
+To download a built Windows app, open [GitHub Actions](https://github.com/chanceoss/Companion-101/actions/workflows/windows.yml), choose a successful run for the latest commit, and download its **Biscuit-Windows-x64** artifact while signed in to GitHub. Extract the artifact and the contained app ZIP, then keep the full Biscuit folder. Artifacts expire under GitHub's retention policy; the source ZIP above remains available.
 
 ## Development and tests
 
@@ -124,6 +144,8 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python run_pet.py --smoke-test
 ```
 
 On Windows use `.venv\Scripts\python` instead. `--smoke-test` bypasses single-instance locking, renders the native widgets, and exits after two seconds. Tests cover the simultaneous companion/chat layout, gear navigation, separate preference saves, conversation preservation and request cancellation, compact/wide resizing, plain-text message wrapping, bundled fonts, all five activities, greeting and reaction restoration, focus timing, pointer following, dragging, directional walking, configurable animation playback, randomized idle choices, interrupted transitions, sprite configuration, corrupted preferences, offline chat, clean shutdown, and real async requests against a local mock AI provider. They do not call a paid provider.
+
+The smart-service tests also cover provider discovery/context isolation, bounded HTTP retries, weather caching, optional backend absence, local speech workers and microphone permission failure, SQLite migrations/timezones, reminder delivery, OAuth scopes/PKCE, Google task confirmations/conflicts, Calendar parsing, battery notices, trivia scoring, and packaged-worker protocols. External accounts and voice models are mocked; no test downloads a model or uses paid API quota.
 
 Linux offscreen tests verify the Qt application logic and rendering. **Windows tray behavior, transparent click handling, multiple physical monitors, logon startup, Credential Manager, and the packaged `.exe` require Windows acceptance testing.** A live paid-provider connection requires your configuration and has not been verified by the mock-server tests.
 
@@ -168,11 +190,18 @@ desktop_pet/
   panel.py     Responsive native panel, activity tiles, chat, settings gear
   chat_widgets.py Native message bubbles, avatars, timestamps, chat scrolling
   preferences.py Gear-opened Preferences window
+  feature_preferences.py Expandable optional service settings and section navigation
+  providers.py Provider presets and asynchronous model discovery
+  tools.py     On-demand weather, voice, system, productivity, and game windows
+  productivity_widgets.py Local reminders/tasks and confirmed Google actions
+  trivia_widgets.py Small native multiple-choice game
+  secrets.py   OS credential storage; rejects plaintext backend fallback
   theme.py     Native garden/icon painting and offline font loading
   ai.py        Async OpenAI-compatible client
   storage.py   Preferences and Windows logon startup
   sprites.py   Sprite manifest, atlas loading, directional frame selection
-  assets/      Character artwork and animation manifest
+  services/    Independent HTTP, weather, voice, reminders, Google, system, and trivia services
+  assets/      Character artwork, manifest, and isolated optional worker scripts
 tests/         Behavior, UI, network, and shutdown tests
 Biscuit.spec   Windows portable packaging configuration
 ```

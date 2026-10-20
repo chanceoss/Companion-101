@@ -33,7 +33,7 @@ Tests use local mock HTTP servers and fixtures. They do not consume paid API quo
 
 ## Weather and system awareness
 
-Use **Tools → Weather** to search for a city and explicitly select it. This enables weather for that location; no GPS/IP geolocation is requested. Open-Meteo receives the selected coordinates/city search. The page shows current °C conditions, a three-day forecast, chance of rain, attribution, and whether results are cached/stale. Refresh intervals are configurable (15–180 minutes; default 30). Manual refresh is throttled to once a minute, city searches to once every three seconds, and safe reads have at most one delayed retry. A local weather cache provides clearly labeled last-known conditions when offline. Disable weather in the gear's Weather group to stop background requests.
+Use **Tools → Weather** to search for a city and explicitly select it. This enables weather for that location; no GPS/IP geolocation is requested. Open-Meteo receives the selected coordinates/city search. The page shows current °C conditions, a three-day forecast, chance of rain, attribution, and whether results are cached/stale. Refresh intervals are configurable (15–180 minutes; default 30). Manual refresh is throttled to once a minute, city searches to once every three seconds, and safe reads have at most two delayed retries (one second, then two seconds). A local weather cache provides clearly labeled last-known conditions when offline. Disable weather in the gear's Weather group to stop background requests.
 
 Optional weather reactions use existing Biscuit animations and do not interrupt Work, dragging, greeting, or another reaction. They are off by default. Open-Meteo's public free service is for **non-commercial use**; review its commercial terms before distributing a commercial service. Weather data attribution is Open-Meteo / CC BY 4.0.
 
@@ -69,7 +69,7 @@ Notifications are checked locally every 15 seconds and delivered once, with pers
 
 1. Create a Google Cloud project and enable the Tasks and/or Calendar API.
 2. Configure the OAuth consent screen and required test users/verification. Create a **Desktop app** OAuth client, download its JSON, and select it in the gear’s Reminders and Google group. Web/service-account clients are not accepted.
-3. Install optional dependencies with `python -m pip install '.[google]'`. For an external environment, select its Python executable. A small portable build may need that environment; packages are never installed automatically.
+3. Install optional dependencies with `python -m pip install '.[google]'`. For an external environment, select its Python executable. The standard portable build includes these small Google dependencies; a custom minimal build can use an external Python environment. Packages are never installed automatically.
 4. Open Tools → Google and explicitly connect Calendar and/or Tasks. Biscuit explains permissions, opens a browser, uses PKCE with a short-lived loopback callback, and stores tokens only through keyring. If secure storage is unavailable, connection is refused rather than saved to plaintext.
 5. Disconnect either integration from that page. It cancels workers and disables access. Calendar data is cleared; local task copies remain. You may also remove Biscuit’s grant in Google account security settings. OS credential-removal errors are reported.
 
@@ -77,7 +77,7 @@ Calendar requests only `calendar.events.readonly` and reads the primary calendar
 
 Tasks requests the `tasks` scope because users can explicitly create/complete tasks. Select a list and Read / sync to import copies. Reads deduplicate by list/external ID, preserve dirty local records, and never delete records merely because a response omits them. Upload selected… and Mark selected done… each show a confirmation before a cloud write. Google due dates are date-only; local reminders support exact times.
 
-Writes never retry automatically. An uncertain upload is marked for review; refresh and explicitly link an existing cloud task to avoid duplicates. Completion uses the retrieved ETag/If-Match; changed cloud data requires refresh/review. Use cloud version locally… resolves a conflict by explicitly discarding local edits to that copy. Link existing cloud task… merges only a redundant local cache after confirmation. No cloud deletion exists. Reads stop after ten pages and show a partial-result warning.
+Writes never retry automatically. An uncertain upload is marked for review; refresh and explicitly link an existing cloud task to avoid duplicates. Completion uses the retrieved ETag/If-Match; changed cloud data requires refresh/review. Use cloud copy… resolves a conflict by explicitly discarding local edits to that copy. Link existing task… merges only a redundant local cache after confirmation. No cloud deletion exists. Reads stop after ten pages and show a partial-result warning.
 
 Calendar/Tasks data stays out of AI context. Tests mock OAuth/API operations, check scopes/PKCE/secure storage, and exercise conflict handling and cancelled confirmations. A live account/project was unavailable, so actual authorization, revoked grants, account policies, and live synchronization require user setup and acceptance testing. Quotas and publishing policies may change; check official sources above.
 
@@ -88,3 +88,58 @@ Open **Tools → Mini games** for multiple-choice trivia, difficulty selection, 
 Enable online questions explicitly in the gear’s Mini games group. Only requesting a question contacts Open Trivia DB; no background daily API calls occur. A batch contains at most five questions and is reused; new batches are limited to once per six seconds, with no automatic retries. Failures show a clear message and use local questions. User answers and scores stay local; no name, chat, or account information is sent. Open Trivia DB question attribution is displayed (CC BY-SA 4.0; review its current terms at https://opentdb.com/api_config.php and the license at https://creativecommons.org/licenses/by-sa/4.0/).
 
 Questions and answers are decoded from HTML entities and displayed as plain text. Score updates lock each question after one answer. Correct answers can trigger a cheerful existing reaction while Biscuit is resting, without interrupting a focus session. The live trivia host was blocked in this cloud workspace; parsing, throttling, fallback, scoring, and native UI behavior were verified with fixtures.
+
+## Setup examples and troubleshooting
+
+For Ollama, install the server yourself and check `ollama list`; use `ollama serve` if it is not already running. Choose a model after reviewing its license, size, and hardware requirements. Biscuit's Test / models button queries the compatible model list and never pulls a model. Local HTTP is restricted to loopback addresses; use Custom plus HTTPS for a remote AI server.
+
+Create an optional speech environment on Windows with:
+
+```powershell
+py -3.12 -m venv voice-env
+voice-env\Scripts\python -m pip install -r requirements-voice.txt
+```
+
+Select voice-env's Python in Preferences → Voice. Models remain separate from the executable. The normal Windows builder installs requirements-integrations.txt for small system/Google adapters; Piper/Faster Whisper stay external to keep the build smaller and avoid silently bundling separately licensed voices or a GPL speech runtime.
+
+Example nonsecret configuration (use the UI to discover/select a real model):
+
+```json
+{
+  "provider": false,
+  "ai_provider": "ollama",
+  "endpoint": "http://localhost:11434/v1",
+  "model": "",
+  "ai_fallback": true,
+  "ai_daily_limit": 20,
+  "voice_mode": "text",
+  "weather_enabled": false,
+  "google_tasks_enabled": false,
+  "google_calendar_enabled": false
+}
+```
+
+There are no keys or OAuth tokens in this example because they never belong in preferences. Known plaintext/file-based alternative keyring backends are refused. A changed custom API host requires re-entering its key rather than silently reusing the previous host's key.
+
+| Symptom | What to check |
+| --- | --- |
+| Ollama executable not found, but server available | PATH detection is advisory; a running compatible localhost server can still provide models. |
+| No installed/supported model | Install/select a model yourself; use Test / models and its exact ID. No model downloads happen through AI connection testing. |
+| Groq access rejected or rate-limited | Check your key/model/account limits. Wait for the cooldown or choose offline/local AI; no other cloud receives a silent retry. |
+| Google authorization fails | Enable the APIs, use a Desktop client, configure consent/test users, and verify account policy. Reconnect revoked/expired grants. |
+| Google secure storage unavailable | Use Windows Credential Manager or a supported OS keyring; no plaintext fallback is provided. |
+| Google write outcome uncertain / cloud changed | Refresh the list. Link the existing task or explicitly accept its cloud copy. Do not repeatedly upload. |
+| Piper/Whisper package missing | Select the Python from the environment where requirements-voice.txt was installed. The core Python/exe does not include heavy speech backends. |
+| Microphone denied/missing | Choose push-to-talk, select a real input, and check Windows Privacy → Microphone and desktop-app access. No recording starts automatically. |
+| Slow/poor Tagalog transcription | Use a multilingual model and, if your hardware permits, a larger local model. Tiny prioritizes size/speed. |
+| Weather unavailable | Select a city explicitly, check connectivity, and respect refresh limits. Stale cached values are labeled. |
+| Missing CPU/RAM or battery | Source installs need psutil; batteries are unavailable on many desktops. Windows power status is a fallback. |
+| Reminder time rejected | Use a valid IANA timezone, install tzdata, and choose a time outside a daylight-saving gap/overlap. |
+| Preferences cannot save | Existing settings stay intact. The pet and workers can still shut down cleanly; fix folder permissions before retrying. |
+| GitHub artifact download fails | Use the latest successful Actions run while signed in. Old artifacts expire; source ZIP download remains available. |
+
+`weather`, `system status`, local reminder commands, and schedule queries use their respective local/retrieved service data. They do not silently send tool results to cloud AI. Clear conversation cancels speech/transcription and pending chat replies; it does not delete reminders, tasks, scores, or account authorization.
+
+## Validation limits
+
+Automated checks cover native Qt UI/behavior, actual local HTTP requests, persistence/migrations, worker protocols, failure paths, and mocked optional backends. No live Google account, cloud key, Ollama server/model, Piper voice, Whisper model, or physical microphone was supplied. These live integrations require user setup and real-device acceptance testing. Windows tray/transparency/DPI/monitor handling, Credential Manager, startup, audio permissions, and the Windows executable need native Windows verification. Linux packaging/smoke checks do not establish Windows release readiness. The Windows workflow includes tests for the real windowed executable and its JSON worker pipes.

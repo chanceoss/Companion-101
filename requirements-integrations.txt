@@ -1,0 +1,6 @@
+# Small optional services included by the standard portable build.
+# Voice packages and models remain in a separate, user-configured environment.
+psutil==7.2.2
+google-auth==2.62.0
+google-auth-oauthlib==1.5.0
+requests==2.34.2
