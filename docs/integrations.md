@@ -56,3 +56,27 @@ Choose a local Piper `.onnx` file with its adjacent `.onnx.json`, and a local Fa
 Change speech speed, volume, voice, input device, and language in the Voice group. **Sound** mutes/unmutes replies; **Tools → Voice** provides sample speech and a stop/cancel action for playback, recording, inference, and downloads. Generating speech/transcribing/downloading runs in cancellable worker processes and does not freeze the Qt event loop. While speaking, a resting Biscuit can wag its tail without disturbing Work.
 
 Microphone PCM stays in memory and is passed to the local worker through pipes. Recordings are not written to disk. Synthesized reply audio uses a temporary WAV removed on shutdown. Recognized text is not sent to AI until you press Send. Device/permission/model errors are shown without exposing transcripts in logs. Actual microphone capture, speakers, Piper voices, and Whisper inference still need validation with your installed models and Windows audio devices; automated tests exercise the pipeline and local-processing constraints with mocked backends.
+
+## SQLite reminders and local tasks
+
+Tools → Reminders stores a title, notes, local date/time, IANA timezone, and notification preference. Tools → Tasks stores local tasks and optional due dates. Data lives in productivity.sqlite3 beside preferences. Migrations use SQLite user_version; newer/corrupt databases are left unchanged and the pet continues without productivity features. Existing JSON preferences are preserved.
+
+Chat understands local commands such as `Remind me to take a break in 30 minutes`, `Remind me to attend my meeting at 3 PM`, `Remind me to rest tomorrow at 12 AM`, and `Show my tasks for today`. No cloud AI is used. Use the date/time interface for other dates. AM/PM uses the configured timezone; a passed time means tomorrow. Due instants are stored in UTC with the original timezone retained. Ambiguous/nonexistent daylight-saving wall times are rejected. Windows installs tzdata for IANA rules. Changing the default timezone does not reschedule saved reminders.
+
+Notifications are checked locally every 15 seconds and delivered once, with persisted acknowledgement. You may hold popups while focusing; due reminders stay queued until focus ends. Turning notifications off prevents alerts, not storage. A stopped app cannot notify; overdue unacknowledged reminders are picked up on launch. Marking a reminder done preserves its record. Tasks and reminder contents never enter AI context automatically.
+
+## Optional Google Tasks and Calendar
+
+1. Create a Google Cloud project and enable the Tasks and/or Calendar API.
+2. Configure the OAuth consent screen and required test users/verification. Create a **Desktop app** OAuth client, download its JSON, and select it in the gear’s Reminders and Google group. Web/service-account clients are not accepted.
+3. Install optional dependencies with `python -m pip install '.[google]'`. For an external environment, select its Python executable. A small portable build may need that environment; packages are never installed automatically.
+4. Open Tools → Google and explicitly connect Calendar and/or Tasks. Biscuit explains permissions, opens a browser, uses PKCE with a short-lived loopback callback, and stores tokens only through keyring. If secure storage is unavailable, connection is refused rather than saved to plaintext.
+5. Disconnect either integration from that page. It cancels workers and disables access. Calendar data is cleared; local task copies remain. You may also remove Biscuit’s grant in Google account security settings. OS credential-removal errors are reported.
+
+Calendar requests only `calendar.events.readonly` and reads the primary calendar for today/upcoming seven days. No creation, editing, or deletion exists. Enabled Calendar refreshes every five minutes; manual refresh is limited to once per 30 seconds. Optional event reminders use a configured lead time and local notification preference. `What's my schedule today?` uses only retrieved information, with a last-retrieved timestamp for cached data; cloud AI never invents events.
+
+Tasks requests the `tasks` scope because users can explicitly create/complete tasks. Select a list and Read / sync to import copies. Reads deduplicate by list/external ID, preserve dirty local records, and never delete records merely because a response omits them. Upload selected… and Mark selected done… each show a confirmation before a cloud write. Google due dates are date-only; local reminders support exact times.
+
+Writes never retry automatically. An uncertain upload is marked for review; refresh and explicitly link an existing cloud task to avoid duplicates. Completion uses the retrieved ETag/If-Match; changed cloud data requires refresh/review. Use cloud version locally… resolves a conflict by explicitly discarding local edits to that copy. Link existing cloud task… merges only a redundant local cache after confirmation. No cloud deletion exists. Reads stop after ten pages and show a partial-result warning.
+
+Calendar/Tasks data stays out of AI context. Tests mock OAuth/API operations, check scopes/PKCE/secure storage, and exercise conflict handling and cancelled confirmations. A live account/project was unavailable, so actual authorization, revoked grants, account policies, and live synchronization require user setup and acceptance testing. Quotas and publishing policies may change; check official sources above.

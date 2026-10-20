@@ -1,5 +1,7 @@
 import argparse
 import math
+import re
+import sqlite3
 from pathlib import Path
 import sys
 import time
@@ -18,6 +20,9 @@ from .services.system_monitor import SystemMonitor
 from .tools import ToolsDialog
 from .services.voice import VoiceService
 from .services.speech_recognition import SpeechRecognition
+from .services.reminders import ReminderService
+from .services.google import GoogleServices
+from .services.calendar import schedule_summary
 
 
 class Application:
@@ -34,6 +39,10 @@ class Application:
         self.system_monitor = SystemMonitor(self.settings)
         self.voice = VoiceService(self.settings)
         self.recognition = SpeechRecognition(self.settings)
+        self.reminders = ReminderService(self.settings)
+        self.google = GoogleServices(self.settings, self.reminders.store)
+        self._pending_notices = []
+        self._calendar_reply = False
         self.tools = ToolsDialog(self.settings, self.weather, self.system_monitor, self.panel)
         self.panel.tools_requested.connect(self.tools.open_page)
         self.panel.preferences_saved.connect(self.apply_services)
@@ -41,7 +50,15 @@ class Application:
         self.weather.updated.connect(self.weather_reaction)
         self.system_monitor.notification.connect(self.ambient_notice)
         self.tools.add_voice(self.voice, self.recognition)
+        self.tools.add_productivity(self.reminders, self.google, self.connect_google)
         self.panel.add_tool('voice', 'Voice')
+        for key, title in (('reminders','Reminders'),('tasks','Tasks'),('google','Google / Calendar')):
+            self.panel.add_tool(key, title)
+        self.reminders.due_reminder.connect(self.deliver_reminder)
+        self.google.due_event.connect(self.deliver_calendar_event)
+        self.google.events_loaded.connect(self.calendar_received)
+        self.google.connection_changed.connect(self.google_connection_changed)
+        self.google.status.connect(self.google_status)
         self.panel.microphone_requested.connect(self.recognition.toggle)
         self.recognition.listening.connect(self.panel.set_listening)
         self.recognition.status.connect(self.panel.set_voice_status)
@@ -96,7 +113,7 @@ class Application:
         self.panel.pet_requested.connect(self.show_love)
         self.panel.sleep_requested.connect(self.toggle_sleep)
         self.panel.scale_changed.connect(self.set_scale)
-        self.panel.message_sent.connect(self.companion.send)
+        self.panel.message_sent.connect(self.handle_message)
         self.panel.clear_requested.connect(self.companion.clear)
         self.panel.quit_requested.connect(self.quit)
         self.panel.focus_requested.connect(self.toggle_focus)
@@ -125,6 +142,9 @@ class Application:
         self.weather.apply_settings()
         self.system_monitor.apply_settings()
         self.voice.apply_settings()
+        self.google.apply_settings()
+        self.reminders.check_due()
+        self.flush_notices()
         if self.settings.get('voice_mode') != 'ptt':
             self.recognition.cancel()
         self.panel.mute_button.setVisible(self.settings.get('voice_mode') in ('spoken','ptt'))
@@ -161,6 +181,79 @@ class Application:
     def model_downloaded(self, kind, path):
         key = 'piper_model' if kind == 'piper' else 'whisper_model'
         self.panel.preferences.features.controls[key].setText(path)
+
+    def connect_google(self, kind):
+        description = ('Read upcoming events from your primary calendar. No event creation or editing.'
+                       if kind == 'calendar' else 'Read task lists and tasks. Creating/completing a cloud task requires another explicit confirmation each time.')
+        answer = QMessageBox.question(self.tools, 'Authorize Google ' + kind.title() + '?',
+            description + '\n\nYour browser will open Google’s desktop OAuth flow. Tokens must be stored in the operating system’s credential store. Continue?')
+        if answer == QMessageBox.Yes:
+            self.google.connect_account(kind, self.settings.get('google_client_file') or '')
+
+    def google_connection_changed(self, kind, enabled):
+        self.panel.preferences.features.controls['google_' + kind + '_enabled'].setChecked(enabled)
+
+    def handle_message(self, text):
+        try:
+            local = self.reminders.handle_message(text)
+        except (sqlite3.Error, ValueError, OSError):
+            self.answer('Local productivity data is unavailable. Existing data was left unchanged.')
+            return
+        if local is not None:
+            self.answer(local)
+            return
+        if re.search(r"(?:what(?:'s| is)|show|view).*(?:my schedule|my calendar|today.?s (?:schedule|meetings)|upcoming meetings)", text, re.I):
+            if not self.settings.get('google_calendar_enabled'):
+                self.answer('Connect read-only Google Calendar in Tools → Google to see your real schedule.')
+            elif self.google.events and self.google.calendar_updated_at:
+                self.answer(schedule_summary(self.google.events, self.settings.get('reminder_timezone') or '') +
+                            '\nLast retrieved: ' + self.google.calendar_updated_at.astimezone().strftime('%Y-%m-%d %H:%M'))
+            else:
+                self._calendar_reply = True
+                self.google.refresh_calendar()
+            return
+        self.companion.send(text)
+
+    def google_status(self, kind, text):
+        if kind=='calendar' and self._calendar_reply and self.google.jobs[kind].process is None:
+            self._calendar_reply = False
+            self.answer(text)
+
+    def calendar_received(self, events):
+        if self._calendar_reply:
+            self._calendar_reply = False
+            self.answer(schedule_summary(events, self.settings.get('reminder_timezone') or ''))
+
+    def deliver_reminder(self, item):
+        self.queue_notice({'kind':'reminder','id':item['id'],'title':'Reminder','message':item['title']})
+
+    def deliver_calendar_event(self, item):
+        self.queue_notice({'kind':'calendar','id':item['notice_key'],'title':'Upcoming event',
+                           'message':item['display'] + ' · ' + item['title']})
+
+    def queue_notice(self, item):
+        if not any(entry['kind']==item['kind'] and entry['id']==item['id'] for entry in self._pending_notices):
+            self._pending_notices.append(item)
+        self.flush_notices()
+
+    def flush_notices(self):
+        if not self.settings.get('notifications') or (self.settings.get('reminder_quiet_focus') and self.focus_deadline is not None):
+            return
+        pending, self._pending_notices = self._pending_notices, []
+        for item in pending:
+            if item['kind']=='calendar' and not self.settings.get('google_calendar_enabled'):
+                continue
+            if item['kind']=='reminder' and self.reminders.store:
+                if not any(row['id']==item['id'] for row in self.reminders.store.reminders()):
+                    continue
+                self.reminders.acknowledge(item['id'])
+            elif item['kind']=='calendar' and self.reminders.store:
+                self.reminders.store.mark_event_notified(item['id'])
+            self.panel.add_message(item['title'], item['message'])
+            if self.tray.isVisible(): self.tray.showMessage(item['title'], item['message'])
+            else: self.pet.say(item['message'])
+            if self.pet.activity=='idle' and not self.pet.gesture and self.pet.isVisible():
+                self.perform_gesture('tail_wag')
 
     def choose_location(self, place):
         self.settings.update(weather_city=place['name'], weather_latitude=place['latitude'],
@@ -251,6 +344,7 @@ class Application:
     def stop_focus(self):
         self.focus_deadline = None
         self.panel.set_focus_remaining(None)
+        self.flush_notices()
 
     def activate_activity(self, key, toggle=True):
         if key not in ("idle", "explore", "work", "greet", "nap", "follow"):
@@ -327,6 +421,8 @@ class Application:
         self.weather.shutdown()
         self.system_monitor.shutdown()
         self.recognition.shutdown()
+        self.reminders.shutdown()
+        self.google.shutdown()
         self.voice.shutdown()
         self.tools.hide()
         self.panel.preferences.shutdown()

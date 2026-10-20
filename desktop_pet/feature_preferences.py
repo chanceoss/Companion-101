@@ -40,6 +40,19 @@ class FeatureSettings(QWidget):
             button.clicked.connect(lambda checked=False,key=kind:self.download_requested.emit(key));voice.addRow(button)
         note=QLabel('No background listening. Microphone audio stays in memory; recognized text is reviewed before Send. Downloads ask first. See the setup guide for optional packages and model licenses.')
         note.setWordWrap(True);voice.addRow(note)
+        productivity=self.page('Reminders and Google')
+        self.check(productivity,'reminder_quiet_focus','Hold reminder popups until focus ends')
+        zone=QLineEdit(settings.get('reminder_timezone') or '')
+        zone.setPlaceholderText('System timezone, or e.g. Asia/Manila')
+        self.controls['reminder_timezone']=zone;productivity.addRow('Reminder timezone',zone)
+        self.path(productivity,'google_client_file','Desktop OAuth JSON','json')
+        self.path(productivity,'google_python','Google Python (optional)','file')
+        self.check(productivity,'google_tasks_enabled','Enable an already authorized Google Tasks connection')
+        self.check(productivity,'google_calendar_enabled','Enable authorized read-only Calendar (refreshes every 5 minutes)')
+        self.check(productivity,'calendar_notifications','Upcoming Google event reminders')
+        self.number(productivity,'calendar_reminder_minutes','Minutes before event',0,60)
+        note=QLabel('Connect/disconnect accounts in Tools → Google. Tokens stay in the OS credential store. Calendar is read-only; each cloud task write asks first.')
+        note.setWordWrap(True);productivity.addRow(note)
 
     def page(self,title):
         page=QWidget();form=QFormLayout(page)
@@ -62,6 +75,8 @@ class FeatureSettings(QWidget):
             result[key]=(control.isChecked() if isinstance(control,QCheckBox) else
                          control.currentData() if isinstance(control,QComboBox) else
                          control.text().strip() if isinstance(control,QLineEdit) else control.value())
+        from .services.reminders import local_zone
+        local_zone(result.get('reminder_timezone',''))
         return result
 
     def combo(self,form,key,title,choices):
@@ -76,7 +91,7 @@ class FeatureSettings(QWidget):
         button=QPushButton('Browse');button.setAutoDefault(False);row.addWidget(button)
         def browse():
             path=(QFileDialog.getExistingDirectory(self,'Choose model folder') if kind=='folder' else
-                  QFileDialog.getOpenFileName(self,title,'','ONNX voice (*.onnx)' if kind=='voice' else 'Executable / Python (*)')[0])
+                  QFileDialog.getOpenFileName(self,title,'','ONNX voice (*.onnx)' if kind=='voice' else 'JSON (*.json)' if kind=='json' else 'Executable / Python (*)')[0])
             if path:control.setText(path)
         button.clicked.connect(browse);self.controls[key]=control;form.addRow(title,row)
 

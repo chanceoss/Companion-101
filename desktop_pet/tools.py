@@ -1,7 +1,7 @@
 """On-demand native tools; the main companion/chat layout stays compact."""
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (QComboBox,QDialog,QHBoxLayout,QLabel,QLineEdit,QPushButton,
-                               QStackedWidget,QVBoxLayout,QWidget)
+                               QStackedWidget,QVBoxLayout,QWidget,QScrollArea)
 
 
 class ToolsDialog(QDialog):
@@ -19,7 +19,8 @@ class ToolsDialog(QDialog):
         close=QPushButton('Close');close.clicked.connect(self.close);layout.addWidget(close)
 
     def add_page(self,key,title,page):
-        self.page_ids[key]=self.pages.addWidget(page);self.selector.addItem(title,key)
+        scroll=QScrollArea();scroll.setWidgetResizable(True);scroll.setWidget(page)
+        self.page_ids[key]=self.pages.addWidget(scroll);self.selector.addItem(title,key)
 
     def open_page(self,key):
         self.selector.setCurrentIndex(self.page_ids[key]);self.show();self.raise_();self.activateWindow()
@@ -88,3 +89,12 @@ class ToolsDialog(QDialog):
         stop=QPushButton('Stop speech / recording / download')
         stop.clicked.connect(lambda:(voice.stop(),recognition.cancel(),voice.download_job.cancel(),status.setText('Stopped.')))
         rows.addWidget(stop);rows.addStretch();self.add_page('voice','Voice',page)
+
+    def add_productivity(self,reminders,google,connect_callback):
+        from .productivity_widgets import RemindersPage,TasksPage,GooglePage
+        self.reminders_page=RemindersPage(reminders,self.settings)
+        self.tasks_page=TasksPage(reminders,google)
+        self.google_page=GooglePage(google,self.settings,connect_callback)
+        self.add_page('reminders','Local reminders',self.reminders_page)
+        self.add_page('tasks','Tasks',self.tasks_page)
+        self.add_page('google','Google connections and calendar',self.google_page)
