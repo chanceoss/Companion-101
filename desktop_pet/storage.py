@@ -9,7 +9,10 @@ DEFAULTS = {"scale": 100, "wander": False, "reminders": False,
             "name": "Biscuit", "provider": False,
             "endpoint": "https://api.openai.com/v1", "model": "gpt-4o-mini",
             "ai_provider": "custom", "provider_profiles": {}, "ai_fallback": False,
-            "ai_max_tokens": 400, "ai_temperature": .7, "ai_daily_limit": 0, "ai_usage": {}}
+            "ai_max_tokens": 400, "ai_temperature": .7, "ai_daily_limit": 0, "ai_usage": {},
+            "weather_enabled": False, "weather_reactions": False, "weather_interval": 30,
+            "weather_latitude": None, "weather_longitude": None, "weather_city": "",
+            "system_enabled": False, "battery_notifications": False, "notifications": True}
 
 
 class Settings:
@@ -27,7 +30,8 @@ class Settings:
             self.values["scale"] = min(150, max(60, int(self.values["scale"])))
         except (ValueError, TypeError):
             self.values["scale"] = 100
-        for key in ("wander", "reminders", "provider", "ai_fallback"):
+        for key in ("wander", "reminders", "provider", "ai_fallback", "weather_enabled", "weather_reactions",
+                    "system_enabled", "battery_notifications", "notifications"):
             self.values[key] = self.values[key] is True
         for key in ("name", "endpoint", "model"):
             if not isinstance(self.values[key], str):

@@ -30,3 +30,11 @@ Source review started on **2026-10-20**. The workspace proxy blocks several vend
 | psutil | [BSD 3-Clause license](https://github.com/giampaolo/psutil/blob/master/LICENSE); license was accessible. Monitoring stays on the computer. |
 
 Tests use local mock HTTP servers and fixtures. They do not consume paid API quota, access a Google account, or download AI/voice models.
+
+## Weather and system awareness
+
+Use **Tools → Weather** to search for a city and explicitly select it. This enables weather for that location; no GPS/IP geolocation is requested. Open-Meteo receives the selected coordinates/city search. The page shows current °C conditions, a three-day forecast, chance of rain, attribution, and whether results are cached/stale. Refresh intervals are configurable (15–180 minutes; default 30). Manual refresh is throttled to once a minute, city searches to once every three seconds, and safe reads have at most one delayed retry. A local weather cache provides clearly labeled last-known conditions when offline. Disable weather in the gear's Weather group to stop background requests.
+
+Optional weather reactions use existing Biscuit animations and do not interrupt Work, dragging, greeting, or another reaction. They are off by default. Open-Meteo's public free service is for **non-commercial use**; review its commercial terms before distributing a commercial service. Weather data attribution is Open-Meteo / CC BY 4.0.
+
+Enable read-only monitoring in the gear's System group, then open **Tools → System status**. Install the optional extra with `python -m pip install ".[system]"` for psutil CPU/RAM/battery values. It samples every 30 seconds without examining processes or application contents. On Windows, a supported power-status API can supply battery information when psutil is unavailable. Desktop PCs without batteries are handled normally. Optional low-battery/charging notices are edge-triggered and throttled; focus sessions suppress them. Nothing is uploaded. These Windows power/tray behaviors still require native Windows verification.

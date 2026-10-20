@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (QCheckBox, QDialog, QFormLayout, QHBoxLayout, QLa
 from .storage import startup_enabled, set_startup
 from .ai import validate_endpoint
 from .providers import PRESETS, ProviderDiscovery, provider_id
+from .feature_preferences import FeatureSettings
 
 
 class ProviderSelector(QComboBox):
@@ -165,6 +166,8 @@ class PreferencesDialog(QDialog):
         self.ai_fields = (self.endpoint, self.model, self.key)
         for field in self.ai_fields:
             field.installEventFilter(self)
+        self.features = FeatureSettings(settings)
+        layout.addWidget(self.features)
         self.save_button = QPushButton("Save preferences")
         self.save_button.setObjectName("primary")
         self.save_button.setDefault(True)
@@ -195,7 +198,7 @@ class PreferencesDialog(QDialog):
             if sys.platform == "win32" and self.startup.isChecked() != startup_enabled():
                 set_startup(self.startup.isChecked())
             self.settings.update(name=self.name.text().strip() or "Biscuit", reminders=self.reminders.isChecked(),
-                                 scale=self.scale.value())
+                                 scale=self.scale.value(), **self.features.values())
             self.status.setText("Preferences saved. Make yourself comfortable.")
         except (OSError, RuntimeError, ValueError) as exc:
             self.status.setText(str(exc))

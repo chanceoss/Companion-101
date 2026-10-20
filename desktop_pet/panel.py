@@ -230,6 +230,7 @@ class ControlPanel(QWidget):
     quit_requested = Signal()
     activity_requested = Signal(str)
     gesture_requested = Signal(str)
+    tools_requested = Signal(str)
 
     def __init__(self, settings, sprites, companion):
         super().__init__()
@@ -380,6 +381,16 @@ class ControlPanel(QWidget):
         heading.addWidget(chat_icon)
         heading.addWidget(label("Chat", "chatTitle"))
         heading.addStretch()
+        self.tools_button = QToolButton()
+        self.tools_button.setText('Tools')
+        self.tools_button.setAccessibleName('Companion tools')
+        self.tools_button.setPopupMode(QToolButton.InstantPopup)
+        self.tools_menu = QMenu(self.tools_button)
+        self.tool_actions = {}
+        for key, title in (('weather', 'Weather'), ('system', 'System status')):
+            self.add_tool(key, title)
+        self.tools_button.setMenu(self.tools_menu)
+        heading.addWidget(self.tools_button)
         self.gesture_button = QToolButton()
         self.gesture_button.setText("Reactions")
         self.gesture_button.setIcon(icon("paw", "#b88042", 18))
@@ -570,6 +581,11 @@ class ControlPanel(QWidget):
     def offer_fallback(self, text):
         self.add_message('Connection', text)
         self.fallback_button.show()
+
+    def add_tool(self, key, title):
+        action = self.tools_menu.addAction(title)
+        action.triggered.connect(lambda checked=False: self.tools_requested.emit(key))
+        self.tool_actions[key] = action
 
     def set_busy(self, busy):
         self.send_button.setEnabled(not busy)

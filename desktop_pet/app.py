@@ -13,6 +13,9 @@ from .pet import PetWindow
 from .sprites import SpriteBank, ASSETS
 from .storage import Settings
 from .gestures import GESTURES
+from .services.weather import WeatherService
+from .services.system_monitor import SystemMonitor
+from .tools import ToolsDialog
 
 
 class Application:
@@ -25,6 +28,14 @@ class Application:
         self.companion.load_key()
         self.pet = PetWindow(self.settings, self.sprites)
         self.panel = ControlPanel(self.settings, self.sprites, self.companion)
+        self.weather = WeatherService(self.settings)
+        self.system_monitor = SystemMonitor(self.settings)
+        self.tools = ToolsDialog(self.settings, self.weather, self.system_monitor, self.panel)
+        self.panel.tools_requested.connect(self.tools.open_page)
+        self.panel.preferences_saved.connect(self.apply_services)
+        self.tools.location_chosen.connect(self.choose_location)
+        self.weather.updated.connect(self.weather_reaction)
+        self.system_monitor.notification.connect(self.ambient_notice)
         self.icon = QIcon(str(ASSETS / "biscuit.png"))
         app.setWindowIcon(self.icon)
         self.panel.setWindowIcon(self.icon)
@@ -93,6 +104,34 @@ class Application:
         self.hello_timer.setSingleShot(True)
         self.hello_timer.timeout.connect(self.welcome)
         self.hello_timer.start(800)
+        self.apply_services()
+
+    def apply_services(self):
+        self.weather.apply_settings()
+        self.system_monitor.apply_settings()
+
+    def choose_location(self, place):
+        self.settings.update(weather_city=place['name'], weather_latitude=place['latitude'],
+                             weather_longitude=place['longitude'], weather_enabled=True)
+        self.panel.preferences.features.controls['weather_enabled'].setChecked(True)
+        self.panel.preferences.features.weather_location.setText('Selected city: ' + place['name'])
+        self.weather.apply_settings()
+
+    def weather_reaction(self, data):
+        if (self.settings.get('weather_reactions') and not data.get('cached') and self.focus_deadline is None
+                and self.pet.activity == 'idle' and not self.pet.gesture and not self.pet.greeting_until
+                and self.pet.animator.state not in ('leaving', 'dragged') and self.pet.isVisible()):
+            self.perform_gesture(data['reaction'])
+            self.pet.say(data['message'])
+
+    def ambient_notice(self, message, reaction):
+        if not self.settings.get('notifications') or self.focus_deadline is not None:
+            return
+        self.pet.say(message)
+        if self.pet.activity == 'idle' and not self.pet.gesture and self.pet.isVisible():
+            self.perform_gesture(reaction)
+        if self.tray.isVisible():
+            self.tray.showMessage('Biscuit', message)
 
     def welcome(self):
         if self.pet.activity in ("idle", "explore") and not self.pet.greeting_until:
@@ -232,6 +271,9 @@ class Application:
         self.hello_timer.stop()
         self.focus_timer.stop()
         self.companion.shutdown()
+        self.weather.shutdown()
+        self.system_monitor.shutdown()
+        self.tools.hide()
         self.panel.preferences.shutdown()
         self.pet.timer.stop()
         self.pet.bubble.hide()
