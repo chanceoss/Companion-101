@@ -1,9 +1,11 @@
 """Bounded asynchronous JSON transport with explicit endpoints and no redirects."""
 
 import json
-from PySide6.QtCore import QObject, Signal, QTimer, QUrl
+
+from PySide6.QtCore import QObject, QTimer, QUrl, Signal
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
-from ..ai import validate_endpoint
+
+from ..ai_protocol import validate_endpoint
 
 
 class JsonClient(QObject):
@@ -20,7 +22,17 @@ class JsonClient(QObject):
         self.retry_timers = {}
 
     def request(
-        self, tag, url, *, method="GET", data=None, key="", retries=2, _attempt=0
+        self,
+        tag,
+        url,
+        *,
+        method="GET",
+        data=None,
+        key="",
+        retries=2,
+        _attempt=0,
+        headers=None,
+        error_formatter=None,
     ):
         if self.closed:
             return
@@ -42,6 +54,8 @@ class JsonClient(QObject):
             QNetworkRequest.ManualRedirectPolicy,
         )
         request.setTransferTimeout(15000)
+        for name, value in (headers or {}).items():
+            request.setRawHeader(name, value)
         if key:
             request.setRawHeader(b"Authorization", ("Bearer " + key).encode())
         payload = json.dumps(data).encode() if data is not None else b""
@@ -103,6 +117,8 @@ class JsonClient(QObject):
                         key=key,
                         retries=retries - 1,
                         _attempt=_attempt + 1,
+                        headers=headers,
+                        error_formatter=error_formatter,
                     )
 
                 timer.timeout.connect(retry)
@@ -119,6 +135,8 @@ class JsonClient(QObject):
                     if status
                     else "The service could not be reached. Check the connection."
                 )
+                if error_formatter is not None and not overflow[0]:
+                    message = error_formatter(status, bytes(body))
                 self.failed.emit(tag, message)
 
         reply.readyRead.connect(read)

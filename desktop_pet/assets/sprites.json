@@ -68,6 +68,33 @@
         0.625,
         0.875
       ]
+    },
+    "conversation": {
+      "file": "conversation-expressions.png",
+      "columns": 4,
+      "rows": 6,
+      "row_edges": [
+        0.0,
+        0.16341145833333334,
+        0.3268229166666667,
+        0.4876302083333333,
+        0.6497395833333334,
+        0.8138020833333334,
+        1.0
+      ],
+      "column_edges": [
+        0.0,
+        0.265625,
+        0.505859375,
+        0.76171875,
+        1.0
+      ],
+      "column_anchors": [
+        0.125,
+        0.375,
+        0.625,
+        0.875
+      ]
     }
   },
   "states": {
@@ -1349,6 +1376,570 @@
           "wave": "sine",
           "amplitude": 0.6,
           "frequency": 1.5
+        }
+      }
+    },
+    "thinking": {
+      "frames": [
+        {
+          "atlas": "conversation",
+          "column": 0,
+          "row": 0
+        },
+        {
+          "atlas": "conversation",
+          "column": 1,
+          "row": 0
+        },
+        {
+          "atlas": "conversation",
+          "column": 1,
+          "row": 0
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 0
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 0
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 0
+        },
+        {
+          "atlas": "conversation",
+          "column": 3,
+          "row": 0
+        },
+        {
+          "atlas": "conversation",
+          "column": 3,
+          "row": 0
+        }
+      ],
+      "fps": 3.2,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "Thinking it over",
+      "transition": {
+        "duration": 0.34,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 0.8,
+          "frequency": 0.65
+        },
+        "rotation": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              0
+            ],
+            [
+              0.35,
+              -2
+            ],
+            [
+              0.65,
+              2
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "easing": "smoothstep"
+        }
+      }
+    },
+    "curious": {
+      "frames": [
+        {
+          "atlas": "conversation",
+          "column": 0,
+          "row": 1
+        },
+        {
+          "atlas": "conversation",
+          "column": 1,
+          "row": 1
+        },
+        {
+          "atlas": "conversation",
+          "column": 1,
+          "row": 1
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 1
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 1
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 1
+        },
+        {
+          "atlas": "conversation",
+          "column": 3,
+          "row": 1
+        },
+        {
+          "atlas": "conversation",
+          "column": 3,
+          "row": 1
+        }
+      ],
+      "fps": 3.2,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "All ears",
+      "transition": {
+        "duration": 0.34,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 0.8,
+          "frequency": 0.65
+        },
+        "rotation": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              0
+            ],
+            [
+              0.35,
+              -2
+            ],
+            [
+              0.65,
+              2
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "easing": "smoothstep"
+        }
+      }
+    },
+    "laughing": {
+      "frames": [
+        {
+          "atlas": "conversation",
+          "column": 0,
+          "row": 2
+        },
+        {
+          "atlas": "conversation",
+          "column": 1,
+          "row": 2
+        },
+        {
+          "atlas": "conversation",
+          "column": 1,
+          "row": 2
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 2
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 2
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 2
+        },
+        {
+          "atlas": "conversation",
+          "column": 3,
+          "row": 2
+        },
+        {
+          "atlas": "conversation",
+          "column": 3,
+          "row": 2
+        }
+      ],
+      "fps": 3.2,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "A little giggle",
+      "transition": {
+        "duration": 0.34,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "bob": {
+          "wave": "abs_sine",
+          "amplitude": -2.4,
+          "frequency": 2
+        },
+        "rotation": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              0
+            ],
+            [
+              0.35,
+              -2
+            ],
+            [
+              0.65,
+              2
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "easing": "smoothstep"
+        },
+        "sy": {
+          "wave": "sine",
+          "amplitude": 0.012,
+          "frequency": 2,
+          "offset": 1
+        }
+      }
+    },
+    "surprised": {
+      "frames": [
+        {
+          "atlas": "conversation",
+          "column": 0,
+          "row": 3
+        },
+        {
+          "atlas": "conversation",
+          "column": 1,
+          "row": 3
+        },
+        {
+          "atlas": "conversation",
+          "column": 1,
+          "row": 3
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 3
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 3
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 3
+        },
+        {
+          "atlas": "conversation",
+          "column": 3,
+          "row": 3
+        },
+        {
+          "atlas": "conversation",
+          "column": 3,
+          "row": 3
+        }
+      ],
+      "fps": 3.2,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "Oh, wow!",
+      "transition": {
+        "duration": 0.34,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 0.8,
+          "frequency": 0.65
+        },
+        "rotation": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              0
+            ],
+            [
+              0.35,
+              -2
+            ],
+            [
+              0.65,
+              2
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "easing": "smoothstep"
+        },
+        "sy": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              1
+            ],
+            [
+              0.2,
+              1.025
+            ],
+            [
+              0.6,
+              1.01
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "easing": "smoothstep"
+        }
+      }
+    },
+    "comforting": {
+      "frames": [
+        {
+          "atlas": "conversation",
+          "column": 0,
+          "row": 4
+        },
+        {
+          "atlas": "conversation",
+          "column": 1,
+          "row": 4
+        },
+        {
+          "atlas": "conversation",
+          "column": 1,
+          "row": 4
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 4
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 4
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 4
+        },
+        {
+          "atlas": "conversation",
+          "column": 3,
+          "row": 4
+        },
+        {
+          "atlas": "conversation",
+          "column": 3,
+          "row": 4
+        }
+      ],
+      "fps": 3.2,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "Right here with you",
+      "transition": {
+        "duration": 0.34,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 0.8,
+          "frequency": 0.65
+        },
+        "rotation": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              0
+            ],
+            [
+              0.35,
+              -2
+            ],
+            [
+              0.65,
+              2
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "easing": "smoothstep"
+        }
+      }
+    },
+    "bashful": {
+      "frames": [
+        {
+          "atlas": "conversation",
+          "column": 0,
+          "row": 5
+        },
+        {
+          "atlas": "conversation",
+          "column": 1,
+          "row": 5
+        },
+        {
+          "atlas": "conversation",
+          "column": 1,
+          "row": 5
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 5
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 5
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 5
+        },
+        {
+          "atlas": "conversation",
+          "column": 3,
+          "row": 5
+        },
+        {
+          "atlas": "conversation",
+          "column": 3,
+          "row": 5
+        }
+      ],
+      "fps": 3.2,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "A little blush",
+      "transition": {
+        "duration": 0.34,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 0.8,
+          "frequency": 0.65
+        },
+        "rotation": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              0
+            ],
+            [
+              0.35,
+              -3
+            ],
+            [
+              0.7,
+              3
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "easing": "smoothstep"
+        }
+      }
+    },
+    "chat_thinking": {
+      "frames": [
+        {
+          "atlas": "conversation",
+          "column": 1,
+          "row": 0
+        },
+        {
+          "atlas": "conversation",
+          "column": 1,
+          "row": 0
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 0
+        },
+        {
+          "atlas": "conversation",
+          "column": 2,
+          "row": 0
+        }
+      ],
+      "fps": 1.6,
+      "playback": "pingpong",
+      "eyes": [],
+      "label": "Thinking of a reply",
+      "transition": {
+        "duration": 0.34,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 0.7,
+          "frequency": 0.5
+        },
+        "rotation": {
+          "wave": "sine",
+          "amplitude": 1.2,
+          "frequency": 0.25
         }
       }
     }

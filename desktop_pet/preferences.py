@@ -3,29 +3,31 @@
 import sys
 from copy import deepcopy
 from urllib.parse import urlparse
-from PySide6.QtCore import Qt, Signal, QEvent, QTimer, QPoint
+
+from PySide6.QtCore import QEvent, QPoint, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
+    QDoubleSpinBox,
     QFormLayout,
     QHBoxLayout,
     QLabel,
+    QLayout,
     QLineEdit,
     QPushButton,
     QScrollArea,
     QSlider,
+    QSpinBox,
     QVBoxLayout,
     QWidget,
-    QLayout,
-    QComboBox,
-    QSpinBox,
-    QDoubleSpinBox,
 )
-from .storage import startup_enabled, set_startup
-from .ai import validate_endpoint
-from .providers import PRESETS, ProviderDiscovery, provider_id, local_endpoint
+
+from .ai_protocol import validate_connection, validate_endpoint, validate_key
 from .feature_preferences import FeatureSettings
+from .providers import PRESETS, ProviderDiscovery, credential_account, provider_id
 from .secrets import get_secret
+from .storage import set_startup, startup_enabled
 
 
 class ProviderSelector(QComboBox):
@@ -110,6 +112,12 @@ class PreferencesDialog(QDialog):
         self.reminders = QCheckBox("Gentle stretch reminders every 25 minutes")
         self.reminders.setChecked(settings.get("reminders"))
         layout.addWidget(self.reminders)
+        self.chat_reactions = QCheckBox("React during conversations")
+        self.chat_reactions.setChecked(settings.get("chat_reactions"))
+        self.chat_reactions.setToolTip(
+            "Local expressions while thinking and replying. Focus sessions, naps, and your chosen reactions take priority."
+        )
+        layout.addWidget(self.chat_reactions)
         self.startup = QCheckBox("Meet me when Windows starts")
         self.startup.setChecked(startup_enabled())
         self.startup.setEnabled(sys.platform == "win32")
@@ -153,6 +161,11 @@ class PreferencesDialog(QDialog):
         self.test_ai_button.setAutoDefault(False)
         discovery_row.addWidget(self.test_ai_button)
         layout.addLayout(discovery_row)
+        self.test_chat = QCheckBox("Include minimal chat test (uses provider quota)")
+        self.test_chat.setToolTip(
+            "Sends only ‘Reply with OK.’ using the Reply tokens limit below. No private chat or conversation history is sent."
+        )
+        layout.addWidget(self.test_chat)
         self.share_context = QCheckBox("Include earlier chat with this provider")
         self.share_context.setToolTip(
             "Opt in to sending earlier AI conversation to a changed endpoint. Otherwise earlier messages stay visible but are excluded."
@@ -206,20 +219,35 @@ class PreferencesDialog(QDialog):
         self.discovery = ProviderDiscovery(self)
         self.discovery.status.connect(self.ai_status.setText)
         self.discovery.models_found.connect(self.set_models)
-        self.test_ai_button.clicked.connect(
-            lambda: self.discovery.discover(
-                self.provider.currentData(), self.endpoint.text(), self.key.text()
-            )
-        )
+        self.test_ai_button.clicked.connect(self.test_connection)
         self._profiles = deepcopy(settings.get("provider_profiles"))
+        configured = settings.get("ai_provider")
+        self._offline_source = configured
+        if configured in ("custom", "groq", "ollama"):
+            self._profiles.setdefault(
+                configured,
+                {"endpoint": settings.get("endpoint"), "model": settings.get("model")},
+            )
         self._selection = self.provider.currentData()
         self._credential_drafts = {
             self._selection: (companion.key, companion.remember_key)
         }
+        self._credential_origins = {
+            self._selection: (
+                companion.key,
+                urlparse(settings.get("endpoint")).netloc.lower(),
+            )
+        }
+        if configured == companion._credential_provider:
+            self._credential_origins.setdefault(
+                configured,
+                (companion.key, urlparse(settings.get("endpoint")).netloc.lower()),
+            )
         self.provider.currentIndexChanged.connect(self.choose_provider)
         self.ai_fields = (self.endpoint, self.model, self.key)
         for field in self.ai_fields:
             field.installEventFilter(self)
+            field.textEdited.connect(self.discovery.cancel)
         self.features = FeatureSettings(settings)
         layout.addWidget(self.features)
         self.save_button = QPushButton("Save preferences")
@@ -272,6 +300,7 @@ class PreferencesDialog(QDialog):
             self.settings.update(
                 name=self.name.text().strip() or "Biscuit",
                 reminders=self.reminders.isChecked(),
+                chat_reactions=self.chat_reactions.isChecked(),
                 scale=self.scale.value(),
                 **self.features.values(),
             )
@@ -288,42 +317,26 @@ class PreferencesDialog(QDialog):
             self.endpoint.text().strip().rstrip("/"),
             self.model.text().strip(),
         )
-        key, remember = self.key.text().strip(), self.remember.isChecked()
+        key, remember = self.key.text(), self.remember.isChecked()
         try:
             if enabled:
                 if not endpoint or not model:
                     raise ValueError("Enter an API base URL and model to enable AI.")
-            if endpoint:
+            if enabled:
+                key = validate_connection(selected, endpoint, key)
+                self.check_key_host(selected, endpoint, key)
+            elif endpoint:
                 validate_endpoint(endpoint)
-            if selected == "ollama" and endpoint and not local_endpoint(endpoint):
-                raise ValueError(
-                    "Use a localhost/loopback endpoint for Ollama. Choose Custom for a remote HTTPS server."
-                )
-            previous = self.companion._credential_provider
-            previous = "custom" if previous == "offline" else previous
-            if (
-                enabled
-                and selected == previous
-                and key
-                and key == self.companion.key
-                and not self.key.isModified()
-                and urlparse(endpoint).netloc.lower()
-                != urlparse(self.settings.get("endpoint")).netloc.lower()
-            ):
-                raise ValueError(
-                    "The API host changed. Re-enter its API key, or clear the key for a local server, before saving."
-                )
+            key = validate_key(key)
             changed = (
                 enabled != self.settings.get("provider")
                 or endpoint != self.settings.get("endpoint")
                 or model != self.settings.get("model")
                 or key != self._saved_key
+                or selected != self.settings.get("ai_provider")
             )
-            if selected == "groq" and enabled and not key:
-                raise ValueError("Enter your own Groq API key before enabling Groq.")
             if selected != "offline":
                 self._profiles[selected] = {"endpoint": endpoint, "model": model}
-            previous_provider = self.settings.get("ai_provider")
             self.settings.update(
                 provider=enabled,
                 ai_provider=selected,
@@ -341,12 +354,14 @@ class PreferencesDialog(QDialog):
                 self.companion.select_provider(selected)
             self.companion.select_context(endpoint, self.share_context.isChecked())
             if selected != "offline" and (
-                previous_provider != selected
-                or key != self._saved_key
-                or remember != self._saved_remember
+                key != self.companion.key or remember != self.companion.remember_key
             ):
                 self.companion.save_key(key, remember)
             self._saved_key, self._saved_remember = key, remember
+            self._credential_origins[selected] = (
+                key,
+                urlparse(endpoint).netloc.lower(),
+            )
             self.share_context.setChecked(False)
             self.ai_status.setText(
                 "AI connection saved. Your completed conversation is unchanged."
@@ -355,6 +370,40 @@ class PreferencesDialog(QDialog):
             self.ai_status.setText(str(exc))
         self.saved.emit()
 
+    def check_key_host(self, selected, endpoint, key):
+        origin_key, origin_host = self._credential_origins.get(selected, ("", ""))
+        if (
+            key
+            and key == origin_key
+            and not self.key.isModified()
+            and urlparse(endpoint).netloc.lower() != origin_host
+        ):
+            raise ValueError(
+                "The API host changed. Re-enter its API key, or clear the key for a local server, before testing or saving."
+            )
+
+    def test_connection(self):
+        selected = self.provider.currentData()
+        endpoint = self.endpoint.text().strip().rstrip("/")
+        try:
+            if selected != "offline":
+                key = validate_connection(selected, endpoint, self.key.text())
+                self.check_key_host(selected, endpoint, key)
+            else:
+                key = ""
+        except ValueError as exc:
+            self.ai_status.setText(str(exc))
+            return
+        self.discovery.discover(
+            selected,
+            endpoint,
+            key,
+            model=self.model.text(),
+            test_chat=self.test_chat.isChecked(),
+            temperature=self.temperature.value(),
+            max_tokens=self.max_tokens.value(),
+        )
+
     def set_models(self, models):
         self.model_choices.clear()
         self.model_choices.addItems(models)
@@ -362,6 +411,7 @@ class PreferencesDialog(QDialog):
             self.model.setText(models[0])
 
     def choose_provider(self):
+        self.discovery.cancel()
         old, selected = self._selection, self.provider.currentData()
         if old != "offline":
             self._profiles[old] = {
@@ -369,25 +419,37 @@ class PreferencesDialog(QDialog):
                 "model": self.model.text(),
             }
             self._credential_drafts[old] = (self.key.text(), self.remember.isChecked())
+        elif selected == self._offline_source and selected != "offline":
+            # Enabling the same connection keeps edits made while it was off.
+            self._profiles[selected] = {
+                "endpoint": self.endpoint.text(),
+                "model": self.model.text(),
+            }
+        if selected == "offline" and old != "offline":
+            self._offline_source = old
         self._selection = selected
         self.share_context.setChecked(False)
         self.model_choices.clear()
         profile = self._profiles.get(selected)
-        if profile or selected in ("ollama", "groq"):
+        if selected != "offline":
             _, base, model = PRESETS[selected]
             self.endpoint.setText(profile.get("endpoint", base) if profile else base)
             self.model.setText(profile.get("model", model) if profile else model)
         if selected in self._credential_drafts:
             key, remember = self._credential_drafts[selected]
-        elif selected == "custom" and old == "offline":
+        elif selected == self.companion._credential_provider:
             key, remember = self.companion.key, self.companion.remember_key
+        elif selected == "offline":
+            key, remember = "", False
         else:
             try:
-                account = "api-key" if selected == "custom" else "api-key-" + selected
-                key = get_secret(account) or ""
+                key = get_secret(credential_account(selected)) or ""
             except Exception:
                 key = ""
             remember = bool(key)
+        self._credential_origins.setdefault(
+            selected, (key, urlparse(self.endpoint.text()).netloc.lower())
+        )
         self.key.setText(key)
         self.remember.setChecked(remember)
         self.ai_status.setText(

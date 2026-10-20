@@ -56,6 +56,14 @@ Open **Reactions** beside the Chat heading, or **Biscuit reactions** in the pet'
 
 ![Expressive reactions exported from the actual native pet renderer](docs/expressions.gif)
 
+Biscuit also has **24 additional conversation poses**: Thinking, All ears, Giggle, Surprised, A little comfort, and Blushing. They appear in the same Reactions menu and animate in both the desktop pet and panel portrait.
+
+![Conversation expressions exported from the native pet renderer](docs/conversation-expressions.gif)
+
+During chat, a gentle thinking loop lasts until a response arrives or the request is cancelled. Replies use local phrase matching to choose an expression: jokes → a giggle, thanks → a blush, worry/sadness → comfort, questions → an attentive tilt, and good news → a celebration. The user's emotional cues take priority over a cheerful reply. This works with built-in offline replies, Ollama, and cloud providers, with no additional AI requests or model downloads. It is a small heuristic, so you can always choose a reaction yourself.
+
+Toggle **React during conversations** in Preferences → General. Automatic reactions preserve Work/focus sessions, naps, greetings, dragging, hidden pets, and manually selected gestures. Explore and Follow briefly pause for the expression, then resume. Clearing chat, cancelling a request, or disabling the option stops its waiting loop. Manual reactions remain available when automatic ones are off.
+
 Reactions temporarily pause the current pose or movement, then return Biscuit to the selected activity. A Work timer keeps counting during the reaction. Selecting another activity takes effect immediately, and requesting another reaction blends from the pose currently on screen. While resting, Biscuit randomly chooses one of these reactions or looks around every 6–13 seconds.
 
 ## Interact
@@ -102,6 +110,8 @@ For source installs, `python -m pip install -r requirements-integrations.txt` ad
 ## Offline and optional AI chat
 
 Biscuit now supports **Ollama**, **Groq**, and custom OpenAI-compatible providers, with model discovery, connection testing, separate credentials, and optional offline fallback. See the [integration setup and privacy guide](docs/integrations.md) for provider setup, context-sharing choices, costs, and service terms.
+
+Connection testing can optionally send a minimal chat request after authenticated model discovery. Failures show the HTTP status and recognized safe error codes. See [Groq troubleshooting](docs/groq-troubleshooting.md) for authentication, permission, model, request, and quota errors.
 
 **Offline is the default.** It provides friendly, clearly identified preset replies with no network traffic. The pet animation and desktop features do not require an API key.
 
@@ -173,6 +183,7 @@ To regenerate the native-rendered walking preview with development dependencies 
 .venv/bin/python -m scripts.render_walk_preview
 .venv/bin/python -m scripts.render_activity_preview
 .venv/bin/python -m scripts.render_expression_preview
+.venv/bin/python -m scripts.render_expression_preview --conversation
 .venv/bin/python -m scripts.render_ui_preview
 ```
 

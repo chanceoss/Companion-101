@@ -1,17 +1,19 @@
 import json
 import math
-from datetime import date
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from copy import deepcopy
 import os
-from pathlib import Path
 import sys
+from copy import deepcopy
+from datetime import date
+from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 from PySide6.QtCore import QStandardPaths
 
 DEFAULTS = {
     "scale": 100,
     "wander": False,
     "reminders": False,
+    "chat_reactions": True,
     "name": "Biscuit",
     "provider": False,
     "endpoint": "https://api.openai.com/v1",

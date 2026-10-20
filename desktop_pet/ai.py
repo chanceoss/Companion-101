@@ -1,26 +1,24 @@
 """Asynchronous OpenAI-compatible chat. No tools or desktop access."""
+
 import json
-from datetime import date
 import time
-from urllib.parse import urlparse
-from PySide6.QtCore import QObject, Signal, QUrl
-from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
+from datetime import date
+
+from PySide6.QtCore import QObject, QUrl, Signal
+from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
+
+from .ai_protocol import (
+    apply_ai_headers,
+    chat_payload,
+    chat_text,
+    provider_error,
+    validate_connection,
+    validate_key,
+)
+from .ai_protocol import validate_endpoint as validate_endpoint  # Legacy public import.
 from .model import offline_reply
-from .secrets import get_secret, put_secret, delete_secret
-
-
-def validate_endpoint(base):
-    try:
-        parsed = urlparse(base.strip())
-        hostname = parsed.hostname
-        _ = parsed.port
-    except (ValueError, AttributeError):
-        raise ValueError('Enter a valid API address and port without embedded credentials.') from None
-    if parsed.scheme != "https" and not (parsed.scheme == "http" and hostname in ("localhost", "127.0.0.1", "::1")):
-        raise ValueError("Use an HTTPS API address, or HTTP for a local model on localhost.")
-    if (not hostname or any(c.isspace() for c in hostname) or parsed.username is not None
-            or parsed.password is not None or parsed.query or parsed.fragment):
-        raise ValueError("Enter a base API URL without credentials, query parameters, or fragments.")
+from .providers import credential_account, local_endpoint, provider_id
+from .secrets import delete_secret, get_secret, put_secret
 
 
 class Companion(QObject):
@@ -39,16 +37,16 @@ class Companion(QObject):
         self.history = []
         self.reply = None
         self.pending = ""
-        self._context_route = settings.get('endpoint').rstrip('/')
+        self._context_route = settings.get("endpoint").rstrip("/")
         self._context_start = 0
-        self._failed_message = ''
+        self._failed_message = ""
         self._cooldowns = {}
-        self._request_route = ''
+        self._request_route = ""
         self._oversized = False
-        self._credential_provider = settings.get('ai_provider') or 'custom'
+        self._credential_provider = settings.get("ai_provider") or "custom"
 
     def credential_account(self):
-        return 'api-key' if self._credential_provider in ('custom', 'offline') else 'api-key-' + self._credential_provider
+        return credential_account(self._credential_provider)
 
     def select_provider(self, selected):
         if selected != self._credential_provider:
@@ -57,13 +55,16 @@ class Companion(QObject):
 
     def select_context(self, endpoint, include_previous=False):
         """A destination change starts fresh unless the user opts into sharing."""
-        route = endpoint.rstrip('/')
+        route = endpoint.rstrip("/")
         if route != self._context_route:
             self._context_route = route
             self._context_start = 0 if include_previous else len(self.history)
             if self.history:
-                self.notice.emit('Earlier chat will be included with this connection.' if include_previous else
-                                 'Earlier chat stays visible; this connection starts with new messages only.')
+                self.notice.emit(
+                    "Earlier chat will be included with this connection."
+                    if include_previous
+                    else "Earlier chat stays visible; this connection starts with new messages only."
+                )
 
     def load_key(self):
         try:
@@ -74,9 +75,7 @@ class Companion(QObject):
             self.remember_key = False
 
     def save_key(self, key, remember):
-        if '\r' in key or '\n' in key:
-            raise ValueError('The API key must be on one line.')
-        self.key = key.strip()
+        self.key = validate_key(key)
         was_stored = self.remember_key
         self.remember_key = False
         try:
@@ -87,9 +86,13 @@ class Companion(QObject):
                 delete_secret(self.credential_account())
         except Exception:
             if remember:
-                raise RuntimeError("Secure credential storage is unavailable. Your key works for this session, but was not saved.") from None
+                raise RuntimeError(
+                    "Secure credential storage is unavailable. Your key works for this session, but was not saved."
+                ) from None
             self.remember_key = was_stored
-            raise RuntimeError('The stored key could not be removed. Remove it from the operating system credential store or try again.') from None
+            raise RuntimeError(
+                "The stored key could not be removed. Remove it from the operating system credential store or try again."
+            ) from None
 
     def send(self, message):
         if self.reply is not None:
@@ -98,39 +101,64 @@ class Companion(QObject):
             self.answered.emit(offline_reply(message, self.settings.get("name")))
             return
         base = self.settings.get("endpoint").strip().rstrip("/")
+        selected = provider_id(self.settings)
+        self.select_provider(selected)
         if time.monotonic() < self._cooldowns.get(base, 0):
-            self._failure('The provider asked us to wait. Please try again shortly.', message)
+            self._failure(
+                "The provider asked us to wait. Please try again shortly.", message
+            )
             return
         try:
-            validate_endpoint(base)
+            key = validate_connection(selected, base, self.key)
         except ValueError as exc:
             self._failure(str(exc), message)
             return
         self.select_context(base)
-        from .providers import local_endpoint
         if not local_endpoint(base):
-            usage = self.settings.get('ai_usage') or {}
-            count = usage.get('count', 0) if usage.get('day') == date.today().isoformat() else 0
-            limit = self.settings.get('ai_daily_limit') or 0
+            usage = self.settings.get("ai_usage") or {}
+            count = (
+                usage.get("count", 0)
+                if usage.get("day") == date.today().isoformat()
+                else 0
+            )
+            limit = self.settings.get("ai_daily_limit") or 0
             if limit and count >= limit:
-                self._failure('Your daily cloud-message limit has been reached. Local/offline chat remains available.', message)
+                self._failure(
+                    "Your daily cloud-message limit has been reached. Local/offline chat remains available.",
+                    message,
+                )
                 return
             try:
-                self.settings.update(ai_usage={'day': date.today().isoformat(), 'count': count + 1})
+                self.settings.update(
+                    ai_usage={"day": date.today().isoformat(), "count": count + 1}
+                )
             except OSError:
-                self._failure('The cloud usage counter could not be saved. Try local/offline chat.', message)
+                self._failure(
+                    "The cloud usage counter could not be saved. Try local/offline chat.",
+                    message,
+                )
                 return
         request = QNetworkRequest(QUrl(base + "/chat/completions"))
-        request.setHeader(QNetworkRequest.ContentTypeHeader, "application/json")
-        request.setAttribute(QNetworkRequest.RedirectPolicyAttribute, QNetworkRequest.ManualRedirectPolicy)
+        apply_ai_headers(request, key)
+        request.setAttribute(
+            QNetworkRequest.RedirectPolicyAttribute,
+            QNetworkRequest.ManualRedirectPolicy,
+        )
         request.setTransferTimeout(45000)
-        if self.key:
-            request.setRawHeader(b"Authorization", ("Bearer " + self.key).encode())
-        system = {"role": "system", "content": f"You are {self.settings.get('name')}, a friendly little orange desktop pet. Be warm, concise, playful, and helpful. You can chat but cannot see or control the desktop. Never pretend to have performed actions."}
+        system = {
+            "role": "system",
+            "content": f"You are {self.settings.get('name')}, a friendly little orange desktop pet. Be warm, concise, playful, and helpful. You can chat but cannot see or control the desktop. Never pretend to have performed actions.",
+        }
         self.pending = message
-        payload = {"model": self.settings.get("model"), "messages": [system] + self.history[self._context_start:][-20:] + [{"role": "user", "content": message}],
-                   "max_tokens": self.settings.get('ai_max_tokens') or 400,
-                   "temperature": self.settings.get('ai_temperature')}
+        payload = chat_payload(
+            selected,
+            self.settings.get("model"),
+            [system]
+            + self.history[self._context_start :][-20:]
+            + [{"role": "user", "content": message}],
+            self.settings.get("ai_max_tokens") or 400,
+            self.settings.get("ai_temperature"),
+        )
         self.busy_changed.emit(True)
         self.reply = self.network.post(request, json.dumps(payload).encode())
         self._request_route = base
@@ -148,37 +176,54 @@ class Companion(QObject):
         reply, self.reply = self.reply, None
         try:
             if self._oversized:
-                self._failure('The provider response was too large. Try a shorter reply.', self.pending)
+                self._failure(
+                    "The provider response was too large. Try a shorter reply.",
+                    self.pending,
+                )
                 return
             status = reply.attribute(QNetworkRequest.HttpStatusCodeAttribute)
+            body = bytes(reply.readAll())
             if reply.error() != QNetworkReply.NoError or status != 200:
-                # Do not echo provider bodies, URLs, or headers, which can contain secrets.
-                reason = "Request timed out or the server could not be reached."
-                if status in (401, 403):
-                    reason = "The provider rejected access. Check your API key and model permissions."
-                elif status == 429:
-                    reason = "The provider rate limit or quota was reached. Try again later."
+                reason = provider_error(status, body)
+                if status == 429:
                     try:
-                        delay = min(300, max(1, int(bytes(reply.rawHeader('Retry-After')) or b'10')))
+                        delay = min(
+                            300,
+                            max(1, int(bytes(reply.rawHeader("Retry-After")) or b"10")),
+                        )
                     except (ValueError, TypeError):
                         delay = 10
                     self._cooldowns[self._request_route] = time.monotonic() + delay
-                elif status == 404:
-                    reason = 'The endpoint or model is unavailable. Discover installed/supported models in Preferences.'
-                elif status:
-                    reason = f"The provider returned HTTP {status}. Check the base URL and model."
                 self._failure(reason, self.pending)
                 return
-            data = json.loads(bytes(reply.readAll()))
-            text = data["choices"][0]["message"]["content"]
-            if not isinstance(text, str) or not text.strip():
-                raise ValueError("Empty response")
-            self.history.extend([{"role": "user", "content": self.pending}, {"role": "assistant", "content": text}])
-            self._context_start = max(0, self._context_start - max(0, len(self.history) - 20))
+            try:
+                data = json.loads(body)
+            except (ValueError, UnicodeError):
+                self._failure(
+                    "The provider returned an unreadable chat response.", self.pending
+                )
+                return
+            try:
+                text = chat_text(data)
+            except ValueError as exc:
+                self._failure(str(exc), self.pending)
+                return
+            self.history.extend(
+                [
+                    {"role": "user", "content": self.pending},
+                    {"role": "assistant", "content": text},
+                ]
+            )
+            self._context_start = max(
+                0, self._context_start - max(0, len(self.history) - 20)
+            )
             self.history = self.history[-20:]
             self.answered.emit(text[:12000])
         except (ValueError, KeyError, IndexError, TypeError):
-            self._failure("The provider returned an unsupported chat response. Use an OpenAI-compatible chat completions API.", self.pending)
+            self._failure(
+                "The provider returned an unsupported chat response. Use an OpenAI-compatible chat completions API.",
+                self.pending,
+            )
         finally:
             reply.deleteLater()
             self.busy_changed.emit(False)
@@ -186,15 +231,20 @@ class Companion(QObject):
     def _failure(self, text, message):
         self.failed.emit(text)
         self._failed_message = message
-        if self.settings.get('ai_fallback'):
+        if self.settings.get("ai_fallback"):
             self.retry_offline()
         else:
-            self.fallback_available.emit('Use an offline reply, or choose a configured provider in Preferences. Nothing is sent to another provider automatically.')
+            self.fallback_available.emit(
+                "Use an offline reply, or choose a configured provider in Preferences. Nothing is sent to another provider automatically."
+            )
 
     def retry_offline(self):
         if self._failed_message:
-            message, self._failed_message = self._failed_message, ''
-            self.answered.emit('[Offline fallback] ' + offline_reply(message, self.settings.get('name')))
+            message, self._failed_message = self._failed_message, ""
+            self.answered.emit(
+                "[Offline fallback] "
+                + offline_reply(message, self.settings.get("name"))
+            )
 
     def cancel_pending(self):
         """Cancel transport without discarding the completed conversation."""
@@ -211,7 +261,7 @@ class Companion(QObject):
         self.cancel_pending()
         self.history.clear()
         self._context_start = 0
-        self._failed_message = ''
+        self._failed_message = ""
 
     def shutdown(self):
         self.clear()

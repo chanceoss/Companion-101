@@ -2,34 +2,37 @@ import argparse
 import math
 import re
 import sqlite3
-from pathlib import Path
 import sys
 import time
-from PySide6.QtCore import Qt, QTimer, QStandardPaths, QLockFile
+from pathlib import Path
+
+from PySide6.QtCore import QLockFile, QStandardPaths, QTimer
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import (
     QApplication,
+    QFileDialog,
     QMenu,
     QMessageBox,
     QSystemTrayIcon,
-    QFileDialog,
 )
+
 from .ai import Companion
+from .conversation import conversation_reaction
+from .gestures import GESTURES
 from .panel import ControlPanel
 from .pet import PetWindow
-from .sprites import SpriteBank, ASSETS
-from .storage import Settings
-from .gestures import GESTURES
-from .services.weather import WeatherService
-from .services.system_monitor import SystemMonitor
-from .tools import ToolsDialog
-from .services.voice import VoiceService
-from .services.speech_recognition import SpeechRecognition
-from .services.reminders import ReminderService
-from .services.google import GoogleServices
 from .services.calendar import schedule_summary
+from .services.google import GoogleServices
+from .services.reminders import ReminderService
+from .services.speech_recognition import SpeechRecognition
+from .services.system_monitor import SystemMonitor
 from .services.trivia import TriviaService
+from .services.voice import VoiceService
+from .services.weather import WeatherService
+from .sprites import ASSETS, SpriteBank
+from .storage import Settings
+from .tools import ToolsDialog
 
 
 class Application:
@@ -52,6 +55,8 @@ class Application:
         self._pending_notices = []
         self._calendar_reply = False
         self._weather_reply = False
+        self._chat_user_text = ""
+        self._chat_gesture = None
         self.tools = ToolsDialog(
             self.settings, self.weather, self.system_monitor, self.panel
         )
@@ -155,6 +160,7 @@ class Application:
             lambda message: self.panel.add_message("Connection", message, error=True)
         )
         self.companion.busy_changed.connect(self.panel.set_busy)
+        self.companion.busy_changed.connect(self.chat_busy)
         self.focus_deadline = None
         self.focus_timer = QTimer(self.pet)
         self.focus_timer.timeout.connect(self.focus_tick)
@@ -177,6 +183,8 @@ class Application:
     def apply_services(self):
         if self._cleaned:
             return
+        if not self.settings.get("chat_reactions"):
+            self.stop_chat_reaction()
         self.weather.apply_settings()
         self.system_monitor.apply_settings()
         self.voice.apply_settings()
@@ -283,6 +291,7 @@ class Application:
         ].setChecked(enabled)
 
     def handle_message(self, text):
+        self._chat_user_text = text[:6000]
         try:
             local = self.reminders.handle_message(text)
         except (sqlite3.Error, ValueError, OSError):
@@ -381,6 +390,8 @@ class Application:
             self.answer(text)
 
     def clear_local_conversation(self):
+        self._chat_user_text = ""
+        self.stop_chat_reaction()
         self.voice.stop()
         self.recognition.cancel()
         self.panel.set_voice_status("")
@@ -559,6 +570,7 @@ class Application:
             self.panel.perform_gesture("happy")
 
     def perform_gesture(self, state):
+        self._chat_gesture = None
         if not self.pet.isVisible():
             self.summon()
         if self.pet.perform_gesture(state):
@@ -652,13 +664,42 @@ class Application:
     def answer(self, message):
         self.panel.add_message(self.settings.get("name"), message)
         self.pet.say(message)
+        self.show_chat_reaction(conversation_reaction(self._chat_user_text, message))
+        self._chat_user_text = ""
         self.voice.speak(message)
+
+    def show_chat_reaction(self, state):
         if (
-            self.pet.activity != "nap"
-            and not self.pet.gesture
-            and self.pet.animator.state not in ("sleeping", "leaving", "dragged")
+            self._cleaned
+            or not self.settings.get("chat_reactions")
+            or not self.pet.isVisible()
+            or self.focus_deadline is not None
+            or self.pet.activity in ("work", "nap")
+            or self.pet.greeting_until
+            or self.pet._paused_greeting
+            or self.pet.drag_offset is not None
+            or self.pet.animator.state in ("sleeping", "dragged", "leaving")
+            or (self.pet.gesture and self.pet.gesture != self._chat_gesture)
         ):
-            self.pet.set_state("happy")
+            return False
+        if self.pet.perform_gesture(state):
+            self._chat_gesture = state
+            self.panel.perform_gesture(state)
+            return True
+        return False
+
+    def stop_chat_reaction(self):
+        state, self._chat_gesture = self._chat_gesture, None
+        if state and self.pet.gesture == state:
+            self.pet.finish_gesture()
+
+    def chat_busy(self, busy):
+        if self._cleaned:
+            return
+        if busy:
+            self.show_chat_reaction("chat_thinking")
+        elif self._chat_gesture == "chat_thinking":
+            self.stop_chat_reaction()
 
     def toggle_focus(self):
         self.activate_activity("work")
@@ -683,6 +724,8 @@ class Application:
         if self._cleaned:
             return
         self._cleaned = True
+        self._chat_user_text = ""
+        self.stop_chat_reaction()
         self.save_position(self.pet.x(), self.pet.y())
         self.hello_timer.stop()
         self.focus_timer.stop()

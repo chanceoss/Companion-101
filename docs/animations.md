@@ -25,7 +25,15 @@ Atlas `row_edges` and `column_edges` are normalized source-image coordinates tha
 
 The existing activity mappings are Explore → `exploring`, Work → `working`, Hi → `greeting`, Nap → `sleeping`, Follow → `following`. Movement uses `walking`; affection uses `happy`; dragging uses `dragged`; show/hide use `entering`/`leaving`. Keep these states when replacing bundled artwork. Adding a new UI activity or a new desktop action still requires application code.
 
-The six reactions map directly to `sitting`, `stretching`, `yawning`, `dancing`, `hopping`, and `tail_wag`. Their artwork is in `expressions.png`, a four-column, six-row atlas in that order. Each row supplies four poses; the configured sequences repeat cells for holds and repeated movements. Replace these frame lists to change a reaction without changing its menu action. `happy` shares the dance artwork for affection and celebrations.
+The six original reactions map directly to `sitting`, `stretching`, `yawning`, `dancing`, `hopping`, and `tail_wag`. Their artwork is in `expressions.png`, a four-column, six-row atlas in that order. Each row supplies four poses; the configured sequences repeat cells for holds and repeated movements. Replace these frame lists to change a reaction without changing its menu action. `happy` shares the dance artwork for affection and celebrations.
+
+`conversation-expressions.png` adds another four-column, six-row transparent atlas. Its rows are `thinking`, `curious`, `laughing`, `surprised`, `comforting`, and `bashful`. Each has four distinct painted poses, a configured hold sequence, subtle motion, `eyes: []`, and a 0.34-second incoming blend. Source row/column edges are calibrated to the transparent gutters; explicit column anchors keep the body stable as paws and tail move. The existing loader preloads all 24 cells. PNG assets are included by the existing wheel/PyInstaller asset rules.
+
+The internal `chat_thinking` clip reuses the thinking row in a looping ping-pong sequence. The chat lifecycle owns it: response, cancellation, clear, and disabling automatic reactions end the loop. It is excluded from the manual menu and random idle choices. The manual `thinking` reaction is still a one-shot and returns to the current activity. There are no new animation-engine branches or background polling timers.
+
+`conversation.py` selects an allowlisted reaction from local text/phrase rules, ignoring fenced/inline code and quoted lines. The user's worry/sadness takes priority over a cheerful assistant reply. These modest rules are not a sentiment model; adjust them there to change the mapping. Text is processed in memory only, and no reaction metadata, conversation text, or extra request is sent to an AI provider. Preferences → General → **React during conversations** disables automatic reactions while keeping manual menu actions.
+
+Run `python -m scripts.render_expression_preview --conversation` to export `docs/conversation-expressions.gif` and a static PNG from the real native painter. The original preview command still exports the six classic reactions.
 
 ## Clip settings
 
