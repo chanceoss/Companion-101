@@ -17,7 +17,9 @@ DEFAULTS = {"scale": 100, "wander": False, "reminders": False,
             "voice_python": "", "piper_model": "", "whisper_model": "", "voice_language": "",
             "microphone_device": "", "reminder_timezone": "", "reminder_quiet_focus": True,
             "google_client_file": "", "google_python": "", "google_tasks_enabled": False,
-            "google_calendar_enabled": False, "calendar_notifications": False, "calendar_reminder_minutes": 10}
+            "google_calendar_enabled": False, "calendar_notifications": False, "calendar_reminder_minutes": 10,
+            "trivia_enabled": False, "trivia_total": 0, "trivia_correct": 0,
+            "trivia_daily_date": "", "trivia_daily_answered": False}
 
 
 class Settings:
@@ -37,7 +39,7 @@ class Settings:
             self.values["scale"] = 100
         for key in ("wander", "reminders", "provider", "ai_fallback", "weather_enabled", "weather_reactions",
                     "system_enabled", "battery_notifications", "notifications", "voice_muted", "reminder_quiet_focus",
-                    "google_tasks_enabled", "google_calendar_enabled", "calendar_notifications"):
+                    "google_tasks_enabled", "google_calendar_enabled", "calendar_notifications", "trivia_enabled", "trivia_daily_answered"):
             self.values[key] = self.values[key] is True
         for key in ("name", "endpoint", "model"):
             if not isinstance(self.values[key], str):

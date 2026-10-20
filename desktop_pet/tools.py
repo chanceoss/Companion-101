@@ -98,3 +98,8 @@ class ToolsDialog(QDialog):
         self.add_page('reminders','Local reminders',self.reminders_page)
         self.add_page('tasks','Tasks',self.tasks_page)
         self.add_page('google','Google connections and calendar',self.google_page)
+
+    def add_trivia(self,trivia):
+        from .trivia_widgets import TriviaPage
+        self.trivia_page=TriviaPage(trivia)
+        self.add_page('trivia','Mini games',self.trivia_page)

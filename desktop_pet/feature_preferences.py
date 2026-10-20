@@ -53,6 +53,10 @@ class FeatureSettings(QWidget):
         self.number(productivity,'calendar_reminder_minutes','Minutes before event',0,60)
         note=QLabel('Connect/disconnect accounts in Tools → Google. Tokens stay in the OS credential store. Calendar is read-only; each cloud task write asks first.')
         note.setWordWrap(True);productivity.addRow(note)
+        games=self.page('Mini games')
+        self.check(games,'trivia_enabled','Get online questions from Open Trivia DB')
+        note=QLabel('Offline questions and a daily challenge always work. Online requests happen only when you choose a question. Scores stay on this computer.')
+        note.setWordWrap(True);games.addRow(note)
 
     def page(self,title):
         page=QWidget();form=QFormLayout(page)

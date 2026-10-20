@@ -23,6 +23,7 @@ from .services.speech_recognition import SpeechRecognition
 from .services.reminders import ReminderService
 from .services.google import GoogleServices
 from .services.calendar import schedule_summary
+from .services.trivia import TriviaService
 
 
 class Application:
@@ -41,6 +42,7 @@ class Application:
         self.recognition = SpeechRecognition(self.settings)
         self.reminders = ReminderService(self.settings)
         self.google = GoogleServices(self.settings, self.reminders.store)
+        self.trivia = TriviaService(self.settings)
         self._pending_notices = []
         self._calendar_reply = False
         self.tools = ToolsDialog(self.settings, self.weather, self.system_monitor, self.panel)
@@ -51,14 +53,16 @@ class Application:
         self.system_monitor.notification.connect(self.ambient_notice)
         self.tools.add_voice(self.voice, self.recognition)
         self.tools.add_productivity(self.reminders, self.google, self.connect_google)
+        self.tools.add_trivia(self.trivia)
         self.panel.add_tool('voice', 'Voice')
-        for key, title in (('reminders','Reminders'),('tasks','Tasks'),('google','Google / Calendar')):
+        for key, title in (('reminders','Reminders'),('tasks','Tasks'),('google','Google / Calendar'),('trivia','Mini games')):
             self.panel.add_tool(key, title)
         self.reminders.due_reminder.connect(self.deliver_reminder)
         self.google.due_event.connect(self.deliver_calendar_event)
         self.google.events_loaded.connect(self.calendar_received)
         self.google.connection_changed.connect(self.google_connection_changed)
         self.google.status.connect(self.google_status)
+        self.trivia.scored.connect(self.trivia_reaction)
         self.panel.microphone_requested.connect(self.recognition.toggle)
         self.recognition.listening.connect(self.panel.set_listening)
         self.recognition.status.connect(self.panel.set_voice_status)
@@ -166,6 +170,11 @@ class Application:
         if (speaking and self.pet.activity == 'idle' and not self.pet.gesture and
                 self.focus_deadline is None and self.pet.isVisible()):
             self.perform_gesture('tail_wag')
+
+    def trivia_reaction(self, correct, text):
+        if (self.focus_deadline is None and self.pet.activity=='idle' and not self.pet.gesture
+                and not self.pet.greeting_until and self.pet.isVisible()):
+            self.perform_gesture('dancing' if correct else 'tail_wag')
 
     def download_model(self, kind):
         directory = QFileDialog.getExistingDirectory(self.panel.preferences, 'Choose a model download folder')
@@ -423,6 +432,7 @@ class Application:
         self.recognition.shutdown()
         self.reminders.shutdown()
         self.google.shutdown()
+        self.trivia.shutdown()
         self.voice.shutdown()
         self.tools.hide()
         self.panel.preferences.shutdown()

@@ -80,3 +80,11 @@ Tasks requests the `tasks` scope because users can explicitly create/complete ta
 Writes never retry automatically. An uncertain upload is marked for review; refresh and explicitly link an existing cloud task to avoid duplicates. Completion uses the retrieved ETag/If-Match; changed cloud data requires refresh/review. Use cloud version locally… resolves a conflict by explicitly discarding local edits to that copy. Link existing cloud task… merges only a redundant local cache after confirmation. No cloud deletion exists. Reads stop after ten pages and show a partial-result warning.
 
 Calendar/Tasks data stays out of AI context. Tests mock OAuth/API operations, check scopes/PKCE/secure storage, and exercise conflict handling and cancelled confirmations. A live account/project was unavailable, so actual authorization, revoked grants, account policies, and live synchronization require user setup and acceptance testing. Quotas and publishing policies may change; check official sources above.
+
+## Mini games
+
+Open **Tools → Mini games** for multiple-choice trivia, difficulty selection, locally persisted scores, and a daily challenge. Offline questions are included, so the game works without a connection or key. The offline daily challenge is deterministic for the current local date and can be scored only once per day.
+
+Enable online questions explicitly in the gear’s Mini games group. Only requesting a question contacts Open Trivia DB; no background daily API calls occur. A batch contains at most five questions and is reused; new batches are limited to once per six seconds, with no automatic retries. Failures show a clear message and use local questions. User answers and scores stay local; no name, chat, or account information is sent. Open Trivia DB question attribution is displayed (CC BY-SA 4.0; review its current terms at https://opentdb.com/api_config.php and the license at https://creativecommons.org/licenses/by-sa/4.0/).
+
+Questions and answers are decoded from HTML entities and displayed as plain text. Score updates lock each question after one answer. Correct answers can trigger a cheerful existing reaction while Biscuit is resting, without interrupting a focus session. The live trivia host was blocked in this cloud workspace; parsing, throttling, fallback, scoring, and native UI behavior were verified with fixtures.
