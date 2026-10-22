@@ -41,6 +41,15 @@ def test_windows_mapping_keeps_daylight_saving_rules():
         local_to_utc(datetime(2026, 3, 8, 2, 30), zone)
 
 
+def test_unreadable_timezone_data_is_reported_without_filesystem_details(monkeypatch):
+    def unreadable(_):
+        raise OSError("Private filesystem path")
+    monkeypatch.setattr(timezones, "ZoneInfo", unreadable)
+    with pytest.raises(ValueError, match="Timezone unavailable") as error:
+        timezones.local_zone("Asia/Manila")
+    assert "Private filesystem path" not in str(error.value)
+
+
 def test_fixed_offset_reminders_round_trip():
     now = datetime(2026, 10, 22, 4, tzinfo=timezone.utc)
     _, due, name = parse_reminder("Remind me to stretch at 3 PM", "UTC+08:00", now)

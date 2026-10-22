@@ -6,6 +6,13 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from PySide6.QtCore import QTimeZone
 
+UNAVAILABLE = (
+    "Timezone unavailable. Choose an IANA timezone such as Asia/Manila or UTC "
+    "in Preferences → Reminders and Google. Windows app users: install the latest "
+    "complete build. Source users: install the requirements, including tzdata. "
+    "No reminder time has been changed."
+)
+
 
 def local_zone(name=""):
     selected = name.strip() or bytes(QTimeZone.systemTimeZoneId()).decode("utf-8", errors="replace")
@@ -18,14 +25,10 @@ def local_zone(name=""):
         if h < 24 and m < 60 and s < 60:
             delta = timedelta(hours=h, minutes=m, seconds=s)
             return timezone(delta if sign == "+" else -delta)
+        raise ValueError(UNAVAILABLE)
     # Qt can report a Windows registry name instead of an IANA database key.
     mapped = bytes(QTimeZone.windowsIdToDefaultIanaId(selected.encode("utf-8"))).decode()
     try:
         return ZoneInfo(mapped or selected)
-    except (ZoneInfoNotFoundError, ValueError):
-        raise ValueError(
-            "Timezone unavailable. Choose an IANA timezone such as Asia/Manila or UTC "
-            "in Preferences → Reminders and Google. Windows app users: install the latest "
-            "complete build. Source users: install the requirements, including tzdata. "
-            "No reminder time has been changed."
-        ) from None
+    except (ZoneInfoNotFoundError, ValueError, OSError):
+        raise ValueError(UNAVAILABLE) from None
