@@ -846,8 +846,15 @@ def main():
             )
             return 1
     try:
+        if args.smoke_test:
+            # Exercise dynamically imported tzdata region packages in frozen builds.
+            from .timezones import local_zone
+            for zone_name in ("Asia/Manila", "America/New_York", "Europe/London"):
+                local_zone(zone_name)
         controller = Application(app, show_panel=not args.startup)
     except (OSError, ValueError, KeyError) as exc:
+        if args.smoke_test:
+            return 1
         QMessageBox.critical(None, "Biscuit could not start", str(exc))
         return 1
 

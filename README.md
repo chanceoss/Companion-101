@@ -158,6 +158,14 @@ The included GitHub Actions workflow also tests, builds, smoke-tests, and upload
 
 To download a built Windows app, open [GitHub Actions](https://github.com/chanceoss/Companion-101/actions/workflows/windows.yml), choose a successful run for the latest commit, and download its **Biscuit-Windows-x64** artifact while signed in to GitHub. Extract the artifact and the contained app ZIP, then keep the full Biscuit folder. Artifacts expire under GitHub's retention policy; the source ZIP above remains available.
 
+### “Biscuit could not start” / “Unknown timezone”
+
+Older versions pass the raw Windows/Qt timezone name to Python's IANA timezone database while constructing the Reminders page. Names such as `China Standard Time` and fixed offsets such as `UTC+08:00` are not IANA names; missing timezone data in an installation produces the same error. An optional reminder tool could therefore stop the whole app from opening.
+
+The fix maps Windows names, supports Qt fixed offsets, keeps UTC available without external data, and lets the app open even if a reminder timezone cannot be resolved. Unavailable reminder timezones show an actionable message in Tools → Reminders; scheduling does not silently substitute UTC. Existing reminder timestamps are preserved. Windows packaging now explicitly includes all `tzdata` region packages, and its smoke test checks Manila, New York and London.
+
+For the portable Windows app, download a successful **latest** build from Actions and extract the **entire** app folder, including `_internal`; replacing only `Biscuit.exe` is insufficient. Installing Python packages on your computer does not repair an old standalone executable. For source installs, update the source and run `.venv\Scripts\python -m pip install -r requirements.txt` from the project folder, then launch again. You can set **Preferences → Reminders and Google → Reminder timezone** to `Asia/Manila` if that is your intended timezone.
+
 ## Development and tests
 
 ```bash

@@ -6,20 +6,11 @@ from pathlib import Path
 import re
 import sqlite3
 import uuid
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from PySide6.QtCore import QObject, Signal, QTimer, QTimeZone
+from PySide6.QtCore import QObject, Signal, QTimer
+
+from ..timezones import local_zone as local_zone
 
 UTC = timezone.utc
-
-
-def local_zone(name=""):
-    selected = name or bytes(QTimeZone.systemTimeZoneId()).decode() or "UTC"
-    try:
-        return ZoneInfo(selected)
-    except ZoneInfoNotFoundError:
-        raise ValueError(
-            "Unknown timezone. Enter an IANA name such as Asia/Manila or UTC. Install tzdata on Windows."
-        ) from None
 
 
 def local_to_utc(value, zone):
@@ -356,12 +347,15 @@ class ReminderService(QObject):
         ):
             if not self.store:
                 return self.error
-            today = (
-                self.clock()
-                .astimezone(local_zone(self.settings.get("reminder_timezone") or ""))
-                .date()
-                .isoformat()
-            )
+            try:
+                today = (
+                    self.clock()
+                    .astimezone(local_zone(self.settings.get("reminder_timezone") or ""))
+                    .date()
+                    .isoformat()
+                )
+            except ValueError as exc:
+                return str(exc)
             tasks = [
                 t
                 for t in self.store.tasks()

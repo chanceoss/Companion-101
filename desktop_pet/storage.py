@@ -5,11 +5,11 @@ import sys
 from copy import deepcopy
 from datetime import date
 from pathlib import Path
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from PySide6.QtCore import QStandardPaths
 
 from .avatars import AVATARS, avatar_spec
+from .timezones import local_zone
 
 DEFAULTS = {
     "scale": 100,
@@ -138,8 +138,8 @@ def normalize_settings(raw):
         result["voice_language"] = ""
     if result["reminder_timezone"]:
         try:
-            ZoneInfo(result["reminder_timezone"])
-        except (ZoneInfoNotFoundError, ValueError):
+            local_zone(result["reminder_timezone"])
+        except ValueError:
             result["reminder_timezone"] = ""
     profiles = result["provider_profiles"]
     result["provider_profiles"] = (

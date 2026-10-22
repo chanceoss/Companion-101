@@ -1,7 +1,7 @@
 # Build on Windows: .venv\Scripts\python -m PyInstaller --clean --noconfirm Biscuit.spec
 from pathlib import Path
 from importlib.util import find_spec
-from PyInstaller.utils.hooks import collect_data_files, copy_metadata
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata
 
 root = Path(SPECPATH)
 assets = root / 'desktop_pet' / 'assets'
@@ -26,7 +26,7 @@ a = Analysis(
     pathex=[str(root)],
     binaries=[],
     datas=data_files,
-    hiddenimports=["keyring.backends.Windows", "tzdata", "tzdata.zoneinfo"] + optional_imports,
+    hiddenimports=["keyring.backends.Windows"] + collect_submodules('tzdata') + optional_imports,
     hookspath=[],
     runtime_hooks=[],
     excludes=["tkinter", "PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets",

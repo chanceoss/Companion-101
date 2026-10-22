@@ -50,7 +50,15 @@ class RemindersPage(QWidget):
         self.date = QDateTimeEdit(QDateTime.currentDateTime().addSecs(1800))
         self.date.setCalendarPopup(True)
         self.date.setDisplayFormat("yyyy-MM-dd HH:mm")
-        self.zone = QLineEdit(settings.get("reminder_timezone") or str(local_zone()))
+        zone_warning = ""
+        selected_zone = settings.get("reminder_timezone") or ""
+        try:
+            selected_zone = str(local_zone(selected_zone))
+        except ValueError as exc:
+            # Optional reminder tools must never prevent the desktop pet opening.
+            zone_warning = str(exc)
+        self.zone = QLineEdit(selected_zone)
+        self.zone.setPlaceholderText("System timezone, or e.g. Asia/Manila")
         self.notify = QCheckBox("Notify when due")
         self.notify.setChecked(True)
         form.addRow("Title", self.title)
@@ -68,7 +76,7 @@ class RemindersPage(QWidget):
         actions.addWidget(button("Refresh", self.refresh))
         rows.addLayout(actions)
         self.status = label(
-            service.error or "Stored on this computer. No cloud AI is needed."
+            service.error or zone_warning or "Stored on this computer. No cloud AI is needed."
         )
         rows.addWidget(self.status)
         service.changed.connect(self.refresh)

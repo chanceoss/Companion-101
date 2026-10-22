@@ -182,7 +182,8 @@ class FeatureSettings(QWidget):
             )
         from .services.reminders import local_zone
 
-        local_zone(result.get("reminder_timezone", ""))
+        if result.get("reminder_timezone", "").strip():
+            local_zone(result["reminder_timezone"])
         return result
 
     def combo(self, form, key, title, choices):
