@@ -1,11 +1,11 @@
 """Data-driven animation clips, idle choices, playback, and transitions (no Qt)."""
+import json
+import math
+import random
 from copy import deepcopy
 from dataclasses import dataclass, fields
 from functools import lru_cache
-import json
-import math
 from pathlib import Path
-import random
 
 
 @dataclass(frozen=True)
@@ -215,6 +215,20 @@ class Animator:
         self._pose = self.library.sample(self.state, 0, False)
         self._from_pose = self._pose
         self._schedule_idle()
+
+    def set_library(self, library):
+        """Keep shared clips running; safely leave avatar-specific idle clips."""
+        self.library = library
+        self._previous = self._normalize_layers([
+            layer for layer in self._previous if layer[0] in library.states
+        ])
+        if self.state not in library.states:
+            self.state, self.elapsed = "idle", 0.0
+            self._previous = []
+            self._transition_duration = 0
+            self._from_pose = library.sample("idle", 0, False)
+        self._schedule_idle()
+        self._pose = self._sample_pose()
 
     def _schedule_idle(self):
         idle = self.library.idle

@@ -16,6 +16,7 @@ from .ai_protocol import (
     validate_key,
 )
 from .ai_protocol import validate_endpoint as validate_endpoint  # Legacy public import.
+from .avatars import avatar_spec
 from .model import offline_reply
 from .providers import credential_account, local_endpoint, provider_id
 from .secrets import delete_secret, get_secret, put_secret
@@ -98,7 +99,7 @@ class Companion(QObject):
         if self.reply is not None:
             return
         if not self.settings.get("provider"):
-            self.answered.emit(offline_reply(message, self.settings.get("name")))
+            self.answered.emit(offline_reply(message, self.settings.get("name"), self.settings.get("avatar")))
             return
         base = self.settings.get("endpoint").strip().rstrip("/")
         selected = provider_id(self.settings)
@@ -147,7 +148,7 @@ class Companion(QObject):
         request.setTransferTimeout(45000)
         system = {
             "role": "system",
-            "content": f"You are {self.settings.get('name')}, a friendly little orange desktop pet. Be warm, concise, playful, and helpful. You can chat but cannot see or control the desktop. Never pretend to have performed actions.",
+            "content": f"You are {self.settings.get('name')}, {avatar_spec(self.settings.get('avatar')).description}. Be warm, concise, playful, and helpful. You can chat but cannot see or control the desktop. Never pretend to have performed actions.",
         }
         self.pending = message
         payload = chat_payload(
@@ -243,7 +244,7 @@ class Companion(QObject):
             message, self._failed_message = self._failed_message, ""
             self.answered.emit(
                 "[Offline fallback] "
-                + offline_reply(message, self.settings.get("name"))
+                + offline_reply(message, self.settings.get("name"), self.settings.get("avatar"))
             )
 
     def cancel_pending(self):

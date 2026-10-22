@@ -2,11 +2,13 @@ import json
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
 import pytest
 from PySide6.QtTest import QTest
+
 from desktop_pet.ai import Companion
-from desktop_pet.storage import Settings
 from desktop_pet.preferences import PreferencesDialog
+from desktop_pet.storage import Settings
 
 
 @pytest.fixture
@@ -73,6 +75,33 @@ def test_real_async_request_and_conversation(app, tmp_path, provider):
     assert len(calls[1][1]["messages"]) == 4
     companion.clear()
     assert companion.history == []
+
+
+def test_avatar_change_updates_ai_identity_and_keeps_context(app, tmp_path, provider):
+    endpoint, calls, _ = provider
+    settings = Settings(tmp_path)
+    settings.update(provider=True, endpoint=endpoint, model="test-model")
+    companion = Companion(settings)
+    answers = []
+    companion.answered.connect(answers.append)
+    preferences = PreferencesDialog(settings, companion)
+    try:
+        companion.send("hello")
+        wait_until(lambda: len(answers) == 1)
+        assert "orange desktop pet" in calls[0][1]["messages"][0]["content"]
+        preferences.avatar.setCurrentIndex(preferences.avatar.findData("tori"))
+        preferences.save()
+        companion.send("what kind of companion are you?")
+        wait_until(lambda: len(answers) == 2)
+        messages = calls[-1][1]["messages"]
+        assert "You are Tori" in messages[0]["content"]
+        assert "green tortoise" in messages[0]["content"]
+        assert "orange desktop pet" not in messages[0]["content"]
+        assert len(messages) == 4 and len(companion.history) == 4
+        assert settings.get("endpoint") == endpoint and settings.get("model") == "test-model"
+    finally:
+        companion.shutdown()
+        preferences.deleteLater()
 
 
 @pytest.mark.parametrize("status,body,expected", [

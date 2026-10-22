@@ -1,40 +1,41 @@
 """Native companion sidebar + chat, with Preferences behind the small gear button."""
 
-from PySide6.QtCore import Qt, QRectF, QTimer, Signal, QSize
+from PySide6.QtCore import QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import (
     QColor,
+    QKeySequence,
+    QLinearGradient,
     QPainter,
     QPainterPath,
-    QLinearGradient,
     QPen,
     QShortcut,
-    QKeySequence,
 )
 from PySide6.QtWidgets import (
     QAbstractButton,
     QApplication,
+    QBoxLayout,
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMenu,
     QPushButton,
     QScrollArea,
     QSizePolicy,
     QToolButton,
     QVBoxLayout,
     QWidget,
-    QBoxLayout,
-    QMenu,
 )
-from .activities import ACTIVITIES, BY_KEY, SCENES
-from .chat_widgets import ChatHistory, ConversationFrame
-from .preferences import PreferencesDialog
-from .theme import garden, icon, load_fonts, paw, sparkle, ui_font
+
+from .activities import ACTIVITIES, SCENES
 from .animations import Animator
+from .chat_widgets import ChatHistory, ConversationFrame
 from .gestures import GESTURES
-from .rendering import draw_character
+from .preferences import PreferencesDialog
 from .providers import local_endpoint
+from .rendering import draw_character
+from .theme import garden, icon, load_fonts, paw, sparkle, ui_font
 
 STYLE = """
 QWidget {color: #674c3d; font-family: 'Nunito'; font-size: 15px;}
@@ -281,6 +282,7 @@ class ControlPanel(QWidget):
         load_fonts()
         self.settings, self.sprites, self.companion = settings, sprites, companion
         self.allow_close = False
+        self._busy = False
         self.setObjectName("panel")
         self.setWindowTitle("Biscuit · A little company")
         self.setMinimumSize(480, 540)
@@ -304,7 +306,7 @@ class ControlPanel(QWidget):
         body.addWidget(self.chat_panel, 1)
         self.outer.addLayout(body, 1)
         footer = self.footer = label(
-            "Drag Biscuit to move · Double-click the pet to chat · Right-click for more",
+            "Drag your companion to move · Double-click the pet to chat · Right-click for more",
             "hint",
         )
         footer.setAlignment(Qt.AlignCenter)
@@ -355,7 +357,7 @@ class ControlPanel(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setAccessibleName("Biscuit and activities")
+        scroll.setAccessibleName("Companion and activities")
         scroll.viewport().setAutoFillBackground(False)
         content = QWidget()
         content.setObjectName("sidebarContents")
@@ -451,7 +453,7 @@ class ControlPanel(QWidget):
         self.gesture_button.setIcon(icon("paw", "#b88042", 18))
         self.gesture_button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self.gesture_button.setAccessibleName("Biscuit reactions")
-        self.gesture_button.setToolTip("A little stretch, a dance, or a tail wag")
+        self.gesture_button.setToolTip("A little stretch, a dance, or a playful reaction")
         self.gesture_button.setPopupMode(QToolButton.InstantPopup)
         self.gesture_menu = QMenu(self.gesture_button)
         self.gesture_actions = {}
@@ -635,8 +637,38 @@ class ControlPanel(QWidget):
         self.preferences.raise_()
         self.preferences.activateWindow()
 
+    def set_sprites(self, sprites):
+        self.sprites = sprites
+        self.portrait.sprites = sprites
+        self.portrait.animator.set_library(sprites.animation_library)
+        self.portrait.pose = self.portrait.animator.advance(0)
+        self.portrait.update()
+        for tile in self.activity_buttons.values():
+            tile.sprite = sprites.frame(tile.activity.scene, 0)
+            tile.update()
+        self.transcript.set_sprites(sprites)
+        for state, title in GESTURES:
+            self.gesture_actions[state].setText(sprites.spec(state).get("menu_label", title))
+        self.set_state(self.portrait.animator.state)
+
+    def refresh_identity(self):
+        name = self.settings.get("name")
+        self.pet_name.setText(name)
+        self.setWindowTitle(f"{name} · A little company")
+        self.preferences.setWindowTitle(f"{name} · Preferences")
+        self.preferences.quit_button.setText(f"Quit {name}")
+        self.preferences.provider.setItemText(
+            self.preferences.provider.findData("offline"), f"Offline — {name} responses"
+        )
+        self.portrait.setAccessibleName(f"Give {name} a little love")
+        self.gesture_button.setAccessibleName(f"{name} reactions")
+        self.mute_button.setAccessibleName(f"Mute or unmute {name}")
+        self.input.setAccessibleName(f"Message to {name}")
+        if self._busy:
+            self.input.setPlaceholderText(f"{name} is thinking…")
+
     def on_preferences_saved(self):
-        self.pet_name.setText(self.settings.get("name"))
+        self.refresh_identity()
         self.refresh_mode()
         self.preferences_saved.emit()
 
@@ -747,7 +779,7 @@ class ControlPanel(QWidget):
         self.thinking.setText("A tiny thought is on its way…" if busy else "")
         self.thinking.setVisible(busy and not self.compact)
         self.input.setPlaceholderText(
-            "Biscuit is thinking…" if busy else "Say something to your companion…"
+            f"{self.settings.get('name')} is thinking…" if busy else "Say something to your companion…"
         )
         if not busy and self.isActiveWindow() and not self.preferences.isVisible():
             self.input.setFocus()

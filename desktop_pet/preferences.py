@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from .ai_protocol import validate_connection, validate_endpoint, validate_key
+from .avatars import AVATARS, avatar_spec
 from .feature_preferences import FeatureSettings
 from .providers import PRESETS, ProviderDiscovery, credential_account, provider_id
 from .secrets import get_secret
@@ -91,6 +92,15 @@ class PreferencesDialog(QDialog):
         form.setSpacing(12)
         self.name = QLineEdit(settings.get("name"))
         self.name.setMaxLength(30)
+        self.avatar = QComboBox()
+        self.avatar.setAccessibleName("Companion avatar")
+        for key, spec in AVATARS.items():
+            self.avatar.addItem(spec.title, key)
+        self.avatar.setCurrentIndex(max(0, self.avatar.findData(settings.get("avatar"))))
+        self._draft_avatar = self.avatar.currentData()
+        self.avatar.currentIndexChanged.connect(self.avatar_changed)
+        self.avatar.setToolTip("Choose a companion, then Save preferences to apply. Your chat and activities are kept.")
+        form.addRow("Companion", self.avatar)
         form.addRow("Pet’s name", self.name)
         self.scale = QSlider(Qt.Horizontal)
         self.scale.setRange(60, 150)
@@ -264,7 +274,7 @@ class PreferencesDialog(QDialog):
         outer.addWidget(scroll, 1)
         outer.addWidget(self.status)
         footer = QHBoxLayout()
-        quit_button = QPushButton("Quit Biscuit")
+        quit_button = self.quit_button = QPushButton("Quit Biscuit")
         quit_button.setObjectName("quiet")
         quit_button.setAutoDefault(False)
         quit_button.clicked.connect(self.quit_requested.emit)
@@ -279,7 +289,7 @@ class PreferencesDialog(QDialog):
 
     def navigate_section(self, index):
         if index < 2:
-            target = self.name if index == 0 else self.provider
+            target = self.avatar if index == 0 else self.provider
         else:
             self.features.groups.setCurrentIndex(index - 2)
             target = self.features.groups
@@ -290,6 +300,12 @@ class PreferencesDialog(QDialog):
             ),
         )
 
+    def avatar_changed(self):
+        selected = self.avatar.currentData()
+        if self.name.text().strip() in ("", avatar_spec(self._draft_avatar).name):
+            self.name.setText(avatar_spec(selected).name)
+        self._draft_avatar = selected
+
     def save(self):
         try:
             if (
@@ -298,7 +314,8 @@ class PreferencesDialog(QDialog):
             ):
                 set_startup(self.startup.isChecked())
             self.settings.update(
-                name=self.name.text().strip() or "Biscuit",
+                name=self.name.text().strip() or avatar_spec(self.avatar.currentData()).name,
+                avatar=self.avatar.currentData(),
                 reminders=self.reminders.isChecked(),
                 chat_reactions=self.chat_reactions.isChecked(),
                 scale=self.scale.value(),

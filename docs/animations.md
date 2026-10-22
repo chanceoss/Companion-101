@@ -2,6 +2,16 @@
 
 Edit `desktop_pet/assets/sprites.json` and restart Biscuit. The desktop pet and panel portrait share the same animation library. Frame loading, playback, motion, random idle choices, and transitions are separate from activity selection and screen movement.
 
+## Companion artwork packs
+
+Preferences → General → Companion selects a bundled identity from `desktop_pet/avatars.py`. Biscuit uses `sprites.json`; Tori uses `tori-sprites.json` and the generated, transparent `tori.png` atlas based on the supplied character reference. Stored IDs are allowlisted, never treated as paths. Existing settings default to Biscuit.
+
+Tori's four-column, six-row atlas contains 24 poses: neutral/sitting/happy/calm; two side walk poses and two rear walk poses; sleep/yawn/stretch/hop; curious/thinking/surprised/bashful; two laughs and two comforting poses; explore/work/greet/dance. Source crop edges follow transparent gutters. Leftward movement mirrors the side poses. Tori retains the same activity and conversation state IDs, with `menu_label` overrides for Shell wiggle and Curious tilt. Her additional random `idle_blink` clip uses painted closed eyes; all poses disable Biscuit's orange procedural eyelid overlay.
+
+Both banks are cached after first use. `Animator.set_library` preserves shared clip state and elapsed time, removes obsolete crossfade layers, and returns safely to idle if switching away from an avatar-specific clip. App-level activity, focus deadlines, pending chat, window position, and saved provider credentials are unaffected. The packaging asset rules include both manifests and PNGs.
+
+To add another bundled companion, add an allowlisted identity and a complete manifest covering the existing activity/reaction states. Supply transparent frames and optional directional sequences, then run the avatar lifecycle tests. Render Tori's native reaction preview with `python -m scripts.render_expression_preview --avatar tori --conversation`.
+
 ## Replace or expand an activity
 
 Keep the activity's existing state name and replace its `frames` list. For example, replace `working` with:

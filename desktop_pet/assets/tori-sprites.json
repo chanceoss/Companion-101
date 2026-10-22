@@ -1,0 +1,1685 @@
+{
+  "canvas": [
+    480,
+    480
+  ],
+  "eyes": [],
+  "atlases": {
+    "tori": {
+      "file": "tori.png",
+      "columns": 4,
+      "rows": 6,
+      "row_edges": [
+        0.0,
+        0.17708333333333334,
+        0.31640625,
+        0.4713541666666667,
+        0.6315104166666666,
+        0.791015625,
+        1.0
+      ],
+      "column_edges": [
+        0.0,
+        0.2666015625,
+        0.5078125,
+        0.748046875,
+        1.0
+      ]
+    }
+  },
+  "states": {
+    "idle": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 0
+        }
+      ],
+      "fps": 8.0,
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 1.4,
+          "frequency": 0.3819718634205488,
+          "offset": 0
+        },
+        "rotation": {
+          "wave": "sine",
+          "amplitude": 0.6,
+          "frequency": 0.1909859317102744,
+          "offset": 0
+        },
+        "sx": {
+          "wave": "sine",
+          "amplitude": 0.004,
+          "frequency": 0.3819718634205488,
+          "offset": 1
+        },
+        "sy": {
+          "wave": "sine",
+          "amplitude": -0.006,
+          "frequency": 0.3819718634205488,
+          "offset": 1
+        }
+      },
+      "eyes": []
+    },
+    "walking": {
+      "fps": 8.0,
+      "eyes": [],
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 1
+        },
+        {
+          "atlas": "tori",
+          "column": 1,
+          "row": 1
+        },
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 1
+        },
+        {
+          "atlas": "tori",
+          "column": 1,
+          "row": 1
+        }
+      ],
+      "motion": {
+        "bob": {
+          "wave": "abs_sine",
+          "amplitude": -2,
+          "frequency": "cycle",
+          "offset": 0
+        },
+        "rotation": {
+          "wave": "sine",
+          "amplitude": 1.2,
+          "frequency": "cycle",
+          "offset": 0
+        },
+        "sx": {
+          "wave": "abs_sine",
+          "amplitude": 0.008,
+          "frequency": "cycle",
+          "offset": 1
+        },
+        "sy": {
+          "wave": "abs_sine",
+          "amplitude": -0.008,
+          "frequency": "cycle",
+          "offset": 1
+        }
+      },
+      "mirror_left": true,
+      "transition": {
+        "duration": 0.22,
+        "easing": "smoothstep"
+      },
+      "directions": {
+        "side": [
+          {
+            "atlas": "tori",
+            "column": 0,
+            "row": 1
+          },
+          {
+            "atlas": "tori",
+            "column": 1,
+            "row": 1
+          },
+          {
+            "atlas": "tori",
+            "column": 0,
+            "row": 1
+          },
+          {
+            "atlas": "tori",
+            "column": 1,
+            "row": 1
+          }
+        ],
+        "back": [
+          {
+            "atlas": "tori",
+            "column": 2,
+            "row": 1
+          },
+          {
+            "atlas": "tori",
+            "column": 3,
+            "row": 1
+          },
+          {
+            "atlas": "tori",
+            "column": 2,
+            "row": 1
+          },
+          {
+            "atlas": "tori",
+            "column": 3,
+            "row": 1
+          }
+        ]
+      }
+    },
+    "happy": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 2,
+          "row": 0
+        },
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 4
+        },
+        {
+          "atlas": "tori",
+          "column": 3,
+          "row": 5
+        },
+        {
+          "atlas": "tori",
+          "column": 2,
+          "row": 0
+        }
+      ],
+      "fps": 2.5,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "Feeling loved",
+      "transition": {
+        "duration": 0.22,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "bob": {
+          "wave": "abs_sine",
+          "amplitude": -8,
+          "frequency": 2.5
+        },
+        "rotation": {
+          "wave": "sine",
+          "amplitude": 3,
+          "frequency": 2.5
+        }
+      }
+    },
+    "exploring": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 5
+        }
+      ],
+      "fps": 8.0,
+      "eyes": [],
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 1.2,
+          "frequency": 0.3183098861837907,
+          "offset": 0
+        },
+        "rotation": {
+          "wave": "sine",
+          "amplitude": 0.8,
+          "frequency": 0.15915494309189535,
+          "offset": 0
+        }
+      },
+      "transition": {
+        "duration": 0.35,
+        "easing": "smoothstep"
+      }
+    },
+    "working": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 1,
+          "row": 5
+        }
+      ],
+      "fps": 8.0,
+      "eyes": [],
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 0.65,
+          "frequency": 0.7957747154594768,
+          "offset": 0
+        },
+        "sy": {
+          "wave": "sine",
+          "amplitude": 0.003,
+          "frequency": 0.3183098861837907,
+          "offset": 1
+        }
+      },
+      "transition": {
+        "duration": 0.4,
+        "easing": "smoothstep"
+      }
+    },
+    "greeting": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 2,
+          "row": 5
+        }
+      ],
+      "fps": 0.25,
+      "eyes": [],
+      "playback": "once",
+      "duration": 4,
+      "motion": {
+        "bob": {
+          "wave": "abs_sine",
+          "amplitude": -4,
+          "frequency": 1.432394487827058,
+          "offset": 0
+        },
+        "rotation": {
+          "wave": "sine",
+          "amplitude": 2.5,
+          "frequency": 1.432394487827058,
+          "offset": 0
+        },
+        "sx": {
+          "wave": "sine",
+          "amplitude": 0.008,
+          "frequency": 1.432394487827058,
+          "offset": 1
+        },
+        "sy": {
+          "wave": "sine",
+          "amplitude": -0.008,
+          "frequency": 1.432394487827058,
+          "offset": 1
+        }
+      },
+      "transition": {
+        "duration": 0.35,
+        "easing": "smoothstep"
+      }
+    },
+    "sleeping": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 2
+        }
+      ],
+      "fps": 6.0,
+      "eyes": [],
+      "blink": "closed",
+      "motion": {
+        "bob": 1,
+        "sx": {
+          "wave": "sine",
+          "amplitude": 0.007,
+          "frequency": 0.2705634032562221,
+          "offset": 1
+        },
+        "sy": {
+          "wave": "sine",
+          "amplitude": 0.014,
+          "frequency": 0.2705634032562221,
+          "offset": 1
+        }
+      },
+      "transition": {
+        "duration": 0.6,
+        "easing": "smoothstep"
+      }
+    },
+    "following": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 2,
+          "row": 1
+        }
+      ],
+      "fps": 8.0,
+      "eyes": [],
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 1.2,
+          "frequency": 0.3183098861837907,
+          "offset": 0
+        },
+        "rotation": {
+          "wave": "sine",
+          "amplitude": 0.8,
+          "frequency": 0.15915494309189535,
+          "offset": 0
+        }
+      },
+      "transition": {
+        "duration": 0.3,
+        "easing": "smoothstep"
+      }
+    },
+    "dragged": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 2,
+          "row": 3
+        }
+      ],
+      "fps": 8.0,
+      "motion": {
+        "rotation": {
+          "wave": "sine",
+          "amplitude": 9,
+          "frequency": 1.432394487827058,
+          "offset": 0
+        },
+        "sx": 0.95,
+        "sy": 1.05
+      },
+      "eyes": []
+    },
+    "entering": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 0
+        }
+      ],
+      "fps": 1.5384615384615383,
+      "playback": "once",
+      "duration": 0.65,
+      "transition": {
+        "duration": 0
+      },
+      "motion": {
+        "opacity": {
+          "wave": "progress",
+          "from": 0,
+          "to": 1
+        },
+        "bob": {
+          "wave": "progress",
+          "from": 80,
+          "to": 0
+        },
+        "rotation": {
+          "wave": "progress",
+          "from": -12,
+          "to": 0
+        },
+        "sx": {
+          "wave": "progress",
+          "from": 0.75,
+          "to": 1.0
+        },
+        "sy": {
+          "wave": "progress",
+          "from": 0.75,
+          "to": 1.0
+        }
+      },
+      "next": "idle",
+      "eyes": []
+    },
+    "leaving": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 2,
+          "row": 1
+        }
+      ],
+      "fps": 1.6666666666666667,
+      "playback": "once",
+      "duration": 0.6,
+      "transition": {
+        "duration": 0
+      },
+      "motion": {
+        "opacity": {
+          "wave": "progress",
+          "from": 1,
+          "to": 0
+        },
+        "bob": {
+          "wave": "progress",
+          "from": 0,
+          "to": 80
+        },
+        "rotation": {
+          "wave": "progress",
+          "from": 0,
+          "to": -12
+        },
+        "sx": {
+          "wave": "progress",
+          "from": 1.0,
+          "to": 0.75
+        },
+        "sy": {
+          "wave": "progress",
+          "from": 1.0,
+          "to": 0.75
+        }
+      },
+      "eyes": []
+    },
+    "idle_look": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 3
+        }
+      ],
+      "fps": 0.5555555555555556,
+      "playback": "once",
+      "duration": 1.8,
+      "next": "idle",
+      "motion": {
+        "rotation": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              0
+            ],
+            [
+              0.3,
+              -4
+            ],
+            [
+              0.7,
+              4
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "easing": "smoothstep"
+        },
+        "bob": {
+          "wave": "sine",
+          "amplitude": 1,
+          "frequency": 0.4,
+          "offset": 0
+        }
+      },
+      "eyes": []
+    },
+    "idle_stretch": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 1,
+          "row": 0
+        },
+        {
+          "atlas": "tori",
+          "column": 2,
+          "row": 2
+        },
+        {
+          "atlas": "tori",
+          "column": 2,
+          "row": 2
+        },
+        {
+          "atlas": "tori",
+          "column": 1,
+          "row": 0
+        }
+      ],
+      "fps": 1.6666666666666667,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "A big stretch",
+      "transition": {
+        "duration": 0.35,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "sy": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              1
+            ],
+            [
+              0.25,
+              1.02
+            ],
+            [
+              0.5,
+              1.06
+            ],
+            [
+              0.8,
+              1.01
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "easing": "smoothstep"
+        },
+        "sx": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              1
+            ],
+            [
+              0.4,
+              0.98
+            ],
+            [
+              0.8,
+              1.02
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "easing": "smoothstep"
+        },
+        "rotation": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              0
+            ],
+            [
+              0.35,
+              -2
+            ],
+            [
+              0.65,
+              2
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "easing": "smoothstep"
+        }
+      }
+    },
+    "sitting": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 1,
+          "row": 0
+        },
+        {
+          "atlas": "tori",
+          "column": 3,
+          "row": 0
+        },
+        {
+          "atlas": "tori",
+          "column": 1,
+          "row": 0
+        }
+      ],
+      "fps": 1.3636363636363635,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "Settling down",
+      "transition": {
+        "duration": 0.38,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "bob": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              -3
+            ],
+            [
+              0.35,
+              2
+            ],
+            [
+              0.7,
+              0
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "easing": "smoothstep"
+        },
+        "sy": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              1
+            ],
+            [
+              0.35,
+              0.96
+            ],
+            [
+              0.7,
+              1.01
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "easing": "smoothstep"
+        }
+      },
+      "duration": 2.2
+    },
+    "stretching": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 1,
+          "row": 0
+        },
+        {
+          "atlas": "tori",
+          "column": 2,
+          "row": 2
+        },
+        {
+          "atlas": "tori",
+          "column": 2,
+          "row": 2
+        },
+        {
+          "atlas": "tori",
+          "column": 1,
+          "row": 0
+        }
+      ],
+      "fps": 1.6666666666666667,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "A big stretch",
+      "transition": {
+        "duration": 0.35,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "sy": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              1
+            ],
+            [
+              0.25,
+              1.02
+            ],
+            [
+              0.5,
+              1.06
+            ],
+            [
+              0.8,
+              1.01
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "easing": "smoothstep"
+        },
+        "sx": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              1
+            ],
+            [
+              0.4,
+              0.98
+            ],
+            [
+              0.8,
+              1.02
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "easing": "smoothstep"
+        },
+        "rotation": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              0
+            ],
+            [
+              0.35,
+              -2
+            ],
+            [
+              0.65,
+              2
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "easing": "smoothstep"
+        }
+      }
+    },
+    "yawning": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 1,
+          "row": 0
+        },
+        {
+          "atlas": "tori",
+          "column": 1,
+          "row": 2
+        },
+        {
+          "atlas": "tori",
+          "column": 1,
+          "row": 2
+        },
+        {
+          "atlas": "tori",
+          "column": 3,
+          "row": 0
+        }
+      ],
+      "fps": 1.3333333333333333,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "Sleepy little yawn",
+      "transition": {
+        "duration": 0.4,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "bob": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              0
+            ],
+            [
+              0.3,
+              -2
+            ],
+            [
+              0.6,
+              -3
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "easing": "smoothstep"
+        },
+        "sy": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              1
+            ],
+            [
+              0.3,
+              1.025
+            ],
+            [
+              0.65,
+              1.01
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "easing": "smoothstep"
+        }
+      }
+    },
+    "dancing": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 3,
+          "row": 5
+        },
+        {
+          "atlas": "tori",
+          "column": 2,
+          "row": 0
+        },
+        {
+          "atlas": "tori",
+          "column": 3,
+          "row": 5
+        },
+        {
+          "atlas": "tori",
+          "column": 2,
+          "row": 0
+        }
+      ],
+      "fps": 1.1666666666666667,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "Tiny dance party",
+      "transition": {
+        "duration": 0.28,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "x": {
+          "wave": "sine",
+          "amplitude": 6,
+          "frequency": 1.75
+        },
+        "rotation": {
+          "wave": "sine",
+          "amplitude": 5,
+          "frequency": 1.75
+        },
+        "bob": {
+          "wave": "abs_sine",
+          "amplitude": -6,
+          "frequency": 1.75
+        },
+        "sx": {
+          "wave": "sine",
+          "amplitude": 0.015,
+          "frequency": 1.75,
+          "offset": 1
+        },
+        "sy": {
+          "wave": "sine",
+          "amplitude": -0.015,
+          "frequency": 1.75,
+          "offset": 1
+        }
+      }
+    },
+    "hopping": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 0
+        },
+        {
+          "atlas": "tori",
+          "column": 3,
+          "row": 2
+        },
+        {
+          "atlas": "tori",
+          "column": 3,
+          "row": 2
+        },
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 0
+        }
+      ],
+      "fps": 2.0,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "Playful little hops",
+      "transition": {
+        "duration": 0.22,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "bob": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              0
+            ],
+            [
+              0.05,
+              4
+            ],
+            [
+              0.16,
+              -20
+            ],
+            [
+              0.24,
+              -24
+            ],
+            [
+              0.36,
+              3
+            ],
+            [
+              0.48,
+              0
+            ],
+            [
+              0.53,
+              4
+            ],
+            [
+              0.65,
+              -20
+            ],
+            [
+              0.74,
+              -24
+            ],
+            [
+              0.88,
+              3
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "easing": "smoothstep"
+        },
+        "sy": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              1
+            ],
+            [
+              0.05,
+              0.93
+            ],
+            [
+              0.16,
+              1.03
+            ],
+            [
+              0.3,
+              1
+            ],
+            [
+              0.36,
+              0.94
+            ],
+            [
+              0.48,
+              1
+            ],
+            [
+              0.53,
+              0.93
+            ],
+            [
+              0.65,
+              1.03
+            ],
+            [
+              0.8,
+              1
+            ],
+            [
+              0.88,
+              0.94
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "easing": "smoothstep"
+        },
+        "sx": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              1
+            ],
+            [
+              0.05,
+              1.04
+            ],
+            [
+              0.16,
+              0.98
+            ],
+            [
+              0.36,
+              1.04
+            ],
+            [
+              0.48,
+              1
+            ],
+            [
+              0.53,
+              1.04
+            ],
+            [
+              0.65,
+              0.98
+            ],
+            [
+              0.88,
+              1.04
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "easing": "smoothstep"
+        }
+      }
+    },
+    "tail_wag": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 3,
+          "row": 1
+        },
+        {
+          "atlas": "tori",
+          "column": 2,
+          "row": 1
+        },
+        {
+          "atlas": "tori",
+          "column": 3,
+          "row": 1
+        },
+        {
+          "atlas": "tori",
+          "column": 2,
+          "row": 1
+        }
+      ],
+      "fps": 1.8461538461538463,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "Happy shell wiggle",
+      "transition": {
+        "duration": 0.32,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "rotation": {
+          "wave": "sine",
+          "amplitude": 1.2,
+          "frequency": 1.5
+        },
+        "bob": {
+          "wave": "sine",
+          "amplitude": 0.6,
+          "frequency": 1.5
+        }
+      },
+      "menu_label": "Shell wiggle"
+    },
+    "thinking": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 3
+        },
+        {
+          "atlas": "tori",
+          "column": 1,
+          "row": 3
+        },
+        {
+          "atlas": "tori",
+          "column": 1,
+          "row": 3
+        },
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 0
+        }
+      ],
+      "fps": 1.6,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "Thinking it over",
+      "transition": {
+        "duration": 0.34,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 0.8,
+          "frequency": 0.65
+        },
+        "rotation": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              0
+            ],
+            [
+              0.35,
+              -2
+            ],
+            [
+              0.65,
+              2
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "easing": "smoothstep"
+        }
+      }
+    },
+    "curious": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 0
+        },
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 3
+        },
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 3
+        },
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 0
+        }
+      ],
+      "fps": 1.6,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "A curious little tilt",
+      "transition": {
+        "duration": 0.34,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 0.8,
+          "frequency": 0.65
+        },
+        "rotation": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              0
+            ],
+            [
+              0.35,
+              -2
+            ],
+            [
+              0.65,
+              2
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "easing": "smoothstep"
+        }
+      },
+      "menu_label": "Curious tilt"
+    },
+    "laughing": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 4
+        },
+        {
+          "atlas": "tori",
+          "column": 1,
+          "row": 4
+        },
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 4
+        },
+        {
+          "atlas": "tori",
+          "column": 1,
+          "row": 4
+        }
+      ],
+      "fps": 1.6,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "A little giggle",
+      "transition": {
+        "duration": 0.34,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "bob": {
+          "wave": "abs_sine",
+          "amplitude": -2.4,
+          "frequency": 2
+        },
+        "rotation": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              0
+            ],
+            [
+              0.35,
+              -2
+            ],
+            [
+              0.65,
+              2
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "easing": "smoothstep"
+        },
+        "sy": {
+          "wave": "sine",
+          "amplitude": 0.012,
+          "frequency": 2,
+          "offset": 1
+        }
+      }
+    },
+    "surprised": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 0
+        },
+        {
+          "atlas": "tori",
+          "column": 2,
+          "row": 3
+        },
+        {
+          "atlas": "tori",
+          "column": 2,
+          "row": 3
+        },
+        {
+          "atlas": "tori",
+          "column": 2,
+          "row": 0
+        }
+      ],
+      "fps": 1.6,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "Oh, wow!",
+      "transition": {
+        "duration": 0.34,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 0.8,
+          "frequency": 0.65
+        },
+        "rotation": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              0
+            ],
+            [
+              0.35,
+              -2
+            ],
+            [
+              0.65,
+              2
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "easing": "smoothstep"
+        },
+        "sy": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              1
+            ],
+            [
+              0.2,
+              1.025
+            ],
+            [
+              0.6,
+              1.01
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "easing": "smoothstep"
+        }
+      }
+    },
+    "comforting": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 2,
+          "row": 4
+        },
+        {
+          "atlas": "tori",
+          "column": 2,
+          "row": 4
+        },
+        {
+          "atlas": "tori",
+          "column": 3,
+          "row": 4
+        },
+        {
+          "atlas": "tori",
+          "column": 3,
+          "row": 4
+        }
+      ],
+      "fps": 1.6,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "Right here with you",
+      "transition": {
+        "duration": 0.34,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 0.8,
+          "frequency": 0.65
+        },
+        "rotation": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              0
+            ],
+            [
+              0.35,
+              -2
+            ],
+            [
+              0.65,
+              2
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "easing": "smoothstep"
+        }
+      }
+    },
+    "bashful": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 3,
+          "row": 3
+        },
+        {
+          "atlas": "tori",
+          "column": 3,
+          "row": 0
+        },
+        {
+          "atlas": "tori",
+          "column": 3,
+          "row": 3
+        },
+        {
+          "atlas": "tori",
+          "column": 3,
+          "row": 3
+        }
+      ],
+      "fps": 1.6,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "label": "A little blush",
+      "transition": {
+        "duration": 0.34,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 0.8,
+          "frequency": 0.65
+        },
+        "rotation": {
+          "wave": "keyframes",
+          "keys": [
+            [
+              0,
+              0
+            ],
+            [
+              0.35,
+              -3
+            ],
+            [
+              0.7,
+              3
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "easing": "smoothstep"
+        }
+      }
+    },
+    "chat_thinking": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 1,
+          "row": 3
+        },
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 3
+        }
+      ],
+      "fps": 0.8,
+      "playback": "pingpong",
+      "eyes": [],
+      "label": "Thinking of a reply",
+      "transition": {
+        "duration": 0.34,
+        "easing": "smoothstep"
+      },
+      "motion": {
+        "bob": {
+          "wave": "sine",
+          "amplitude": 0.7,
+          "frequency": 0.5
+        },
+        "rotation": {
+          "wave": "sine",
+          "amplitude": 1.2,
+          "frequency": 0.25
+        }
+      }
+    },
+    "idle_blink": {
+      "frames": [
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 0
+        },
+        {
+          "atlas": "tori",
+          "column": 3,
+          "row": 0
+        },
+        {
+          "atlas": "tori",
+          "column": 0,
+          "row": 0
+        }
+      ],
+      "fps": 5,
+      "playback": "once",
+      "next": "idle",
+      "eyes": [],
+      "transition": {
+        "duration": 0.14,
+        "easing": "smoothstep"
+      }
+    }
+  },
+  "transitions": {
+    "duration": 0.32,
+    "easing": "smoothstep"
+  },
+  "blink": {
+    "interval": [
+      2.5,
+      6
+    ],
+    "duration": 0.16
+  },
+  "idle_behavior": {
+    "base": "idle",
+    "interval": [
+      6,
+      13
+    ],
+    "variants": [
+      "sitting",
+      "stretching",
+      "yawning",
+      "dancing",
+      "hopping",
+      "tail_wag",
+      "idle_look",
+      "idle_blink"
+    ],
+    "weights": [
+      3,
+      2,
+      1,
+      1,
+      1,
+      3,
+      2,
+      3
+    ]
+  },
+  "avatar_crop": [
+    70,
+    60,
+    340,
+    340
+  ]
+}

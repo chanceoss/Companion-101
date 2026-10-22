@@ -12,6 +12,7 @@ from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication
 
+from desktop_pet.avatars import AVATARS, avatar_spec
 from desktop_pet.gestures import CLASSIC_GESTURES, CONVERSATION_GESTURES
 from desktop_pet.pet import PetWindow
 from desktop_pet.sprites import SpriteBank
@@ -22,6 +23,7 @@ from desktop_pet.theme import load_fonts, ui_font
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--conversation", action="store_true")
+    parser.add_argument("--avatar", choices=AVATARS, default="biscuit")
     args = parser.parse_args()
     gestures = CONVERSATION_GESTURES if args.conversation else CLASSIC_GESTURES
     app = QApplication.instance() or QApplication([])
@@ -31,8 +33,11 @@ def main():
         / "docs"
         / ("conversation-expressions.gif" if args.conversation else "expressions.gif")
     )
+    if args.avatar != "biscuit":
+        output = output.with_name(args.avatar + "-" + output.name)
     with TemporaryDirectory() as directory:
-        sprites = SpriteBank()
+        sprites = SpriteBank(avatar=args.avatar)
+        gestures = [(state, sprites.spec(state).get("menu_label", title)) for state, title in gestures]
         pets = []
         for state, title in gestures:
             pet = PetWindow(Settings(Path(directory) / state), sprites)
@@ -59,7 +64,7 @@ def main():
                 Qt.AlignCenter,
                 "Small paws. Big feelings."
                 if args.conversation
-                else "A little more Biscuit.",
+                else f"A little more {avatar_spec(args.avatar).name}.",
             )
             for cell, ((state, title), pet) in enumerate(zip(gestures, pets)):
                 if index == 3:

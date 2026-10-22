@@ -1,12 +1,14 @@
 import math
 import random
 import time
-from PySide6.QtCore import Qt, QPoint, QPointF, QTimer, Signal
-from PySide6.QtGui import QColor, QPainter, QFont, QCursor
-from PySide6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout
-from .model import Animator, WalkMotion, FollowMotion, clamp_position
+
+from PySide6.QtCore import QPoint, QPointF, Qt, QTimer, Signal
+from PySide6.QtGui import QColor, QCursor, QFont, QPainter
+from PySide6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
+
 from .activities import SCENES
 from .gestures import GESTURE_STATES
+from .model import Animator, FollowMotion, WalkMotion, clamp_position
 from .rendering import draw_character
 
 
@@ -87,6 +89,13 @@ class PetWindow(QWidget):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.tick)
         self.timer.start(33)
+
+    def set_sprites(self, sprites):
+        """Change artwork without moving the window or interrupting an activity."""
+        self.sprites = sprites
+        self.animator.set_library(sprites.animation_library)
+        self.pose = self.animator.advance(0)
+        self.update()
 
     def set_scale(self, scale):
         factor = scale / 100

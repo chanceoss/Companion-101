@@ -1,7 +1,9 @@
 """UI-independent animation and movement. All time values are seconds."""
-from dataclasses import dataclass
 import math
-from .animations import Animator, Pose
+from dataclasses import dataclass
+
+from .animations import Animator as Animator
+from .animations import Pose as Pose
 
 
 def clamp_position(x, y, left, top, right, bottom, width, height):
@@ -87,7 +89,7 @@ class FollowMotion:
         return round(x), round(y)
 
 
-def offline_reply(message, name="Biscuit"):
+def offline_reply(message, name="Biscuit", avatar="biscuit"):
     words = message.lower()
     if any(x in words for x in ("sad", "lonely", "tired", "stress", "anxious")):
         return "I’m right here. Unclench your shoulders, take a slow breath, and let’s do one small thing at a time. 🧡"
@@ -96,7 +98,10 @@ def offline_reply(message, name="Biscuit"):
     if any(x in words for x in ("help", "can you", "how to")):
         return "Drag me anywhere, double-click me to open this window, or right-click for my menu. Turn on wandering if you’d like a little company while you work."
     if any(x in words for x in ("love", "cute", "good")):
+        if avatar == "tori":
+            return "You’ve made my little shell wiggle with joy! Consider this a tiny high-five. 💚"
         return "You’ve made my little tail very happy! Consider this a tiny high-five. 🐾"
     if any(x in words for x in ("break", "water", "focus", "work")):
         return "Tiny mission: a sip of water, a stretch, then one focused step. I’ll keep you company."
-    return "I’m listening, with both fuzzy ears. In offline mode I have a few cozy replies; connect an AI provider in Preferences for open-ended conversation."
+    listening = "I’m listening, with a curious little head tilt." if avatar == "tori" else "I’m listening, with both fuzzy ears."
+    return listening + " In offline mode I have a few cozy replies; connect an AI provider in Preferences for open-ended conversation."

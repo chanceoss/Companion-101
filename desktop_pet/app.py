@@ -40,7 +40,8 @@ class Application:
         self.app = app
         self._cleaned = False
         self.settings = settings or Settings()
-        self.sprites = SpriteBank()
+        self.sprites = SpriteBank(avatar=self.settings.get("avatar"))
+        self._sprite_banks = {self.sprites.avatar: self.sprites}
         self.companion = Companion(self.settings, app)
         self.companion.load_key()
         self.pet = PetWindow(self.settings, self.sprites)
@@ -129,7 +130,7 @@ class Application:
         )
         self.action("Hide pet", self.hide_pet)
         self.menu.addSeparator()
-        self.action("Quit Biscuit", self.quit)
+        self.quit_action = self.action("Quit Biscuit", self.quit)
         self.tray.setContextMenu(self.menu)
         self.tray.activated.connect(self.tray_clicked)
         if QSystemTrayIcon.isSystemTrayAvailable():
@@ -178,6 +179,7 @@ class Application:
         self.hello_timer.setSingleShot(True)
         self.hello_timer.timeout.connect(self.welcome)
         self.hello_timer.start(800)
+        self.apply_avatar()
         self.apply_services()
 
     def apply_services(self):
@@ -202,8 +204,31 @@ class Application:
         self.panel.mute_button.blockSignals(False)
 
     def preferences_applied(self):
+        self.apply_avatar()
         self.voice.session_mute = None
         self.apply_services()
+
+    def apply_avatar(self):
+        selected = self.settings.get("avatar")
+        if selected not in self._sprite_banks:
+            self._sprite_banks[selected] = SpriteBank(avatar=selected)
+        self.sprites = self._sprite_banks[selected]
+        self.pet.set_sprites(self.sprites)
+        self.panel.set_sprites(self.sprites)
+        self.panel.refresh_identity()
+        name = self.settings.get("name")
+        self.pet.setWindowTitle(f"{name} · Desktop pet")
+        self.icon = QIcon(self.sprites.frame("idle", 0))
+        self.app.setWindowIcon(self.icon)
+        self.pet.setWindowIcon(self.icon)
+        self.panel.setWindowIcon(self.icon)
+        self.tray.setIcon(self.icon)
+        self.tray.setToolTip(f"{name} · Your desktop companion")
+        self.gesture_menu.setTitle(f"{name} reactions")
+        self.quit_action.setText(f"Quit {name}")
+        for state, title in GESTURES:
+            self.gesture_actions[state].setText(self.sprites.spec(state).get("menu_label", title))
+        self.panel.set_state(self.pet.animator.state)
 
     def review_transcription(self, text):
         previous = self.panel.input.text().strip()

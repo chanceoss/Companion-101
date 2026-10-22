@@ -2,17 +2,21 @@
 import json
 import math
 from pathlib import Path
-from PySide6.QtCore import Qt, QRectF
+
+from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QBitmap, QPainter, QPixmap, QRegion
+
 from .animations import AnimationLibrary
+from .avatars import AVATARS, avatar_spec
 
 ASSETS = Path(__file__).resolve().parent / "assets"
 
 
 class SpriteBank:
-    def __init__(self, directory=ASSETS):
+    def __init__(self, directory=ASSETS, *, avatar="biscuit"):
         self.directory = Path(directory).resolve()
-        self.manifest = json.loads((self.directory / "sprites.json").read_text(encoding="utf-8"))
+        self.avatar = avatar if avatar in AVATARS else "biscuit"
+        self.manifest = json.loads((self.directory / avatar_spec(self.avatar).manifest).read_text(encoding="utf-8"))
         self.animation_library = AnimationLibrary(self.manifest)
         self.images = {}
         self.atlases = {}

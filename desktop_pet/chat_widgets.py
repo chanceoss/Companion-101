@@ -1,18 +1,29 @@
 """Native message bubbles: plain text, selection, avatars, timestamps, and scrolling."""
 import math
-from PySide6.QtCore import Qt, QRectF, QDateTime, QTimer, QSize
+
+from PySide6.QtCore import QDateTime, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QTextOption
-from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QScrollArea, QSizePolicy,
-                               QTextBrowser, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QScrollArea,
+    QSizePolicy,
+    QTextBrowser,
+    QVBoxLayout,
+    QWidget,
+)
+
 from .theme import garden, paw, ui_font
 
 
 class Avatar(QWidget):
-    def __init__(self, sprite, mine=False):
+    def __init__(self, sprite, mine=False, crop=None):
         super().__init__()
         self.sprite, self.mine = sprite, mine
+        self.crop = crop or [92, 14, 290, 280]
         self.setFixedSize(42, 42)
-        self.setAccessibleName("Your avatar" if mine else "Biscuit avatar")
+        self.setAccessibleName("Your avatar" if mine else "Companion avatar")
 
     def paintEvent(self, event):
         p = QPainter(self)
@@ -26,7 +37,7 @@ class Avatar(QWidget):
         if self.mine:
             paw(p, 10, 10, 22, "#a2b382")
         else:
-            p.drawPixmap(QRectF(0, 0, 42, 42), self.sprite, QRectF(92, 14, 290, 280))
+            p.drawPixmap(QRectF(0, 0, 42, 42), self.sprite, QRectF(*self.crop))
 
 
 class BubbleText(QTextBrowser):
@@ -59,13 +70,13 @@ class BubbleText(QTextBrowser):
 
 
 class Message(QWidget):
-    def __init__(self, who, text, sprite, mine=False, error=False):
+    def __init__(self, who, text, sprite, mine=False, error=False, crop=None):
         super().__init__()
         self.setMinimumWidth(0)
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(12)
-        row.addWidget(Avatar(sprite, mine), alignment=Qt.AlignTop)
+        row.addWidget(Avatar(sprite, mine, crop), alignment=Qt.AlignTop)
         content = QVBoxLayout()
         content.setSpacing(8)
         title_row = QHBoxLayout()
@@ -123,9 +134,18 @@ class ChatHistory(QScrollArea):
         self.setAccessibleName("Conversation")
         self.verticalScrollBar().rangeChanged.connect(self.scroll_to_bottom)
 
+    def set_sprites(self, sprites):
+        self.sprites = sprites
+        for avatar in self.content.findChildren(Avatar):
+            if not avatar.mine:
+                avatar.sprite = sprites.frame("idle", 0)
+                avatar.crop = sprites.manifest.get("avatar_crop", [92, 14, 290, 280])
+                avatar.update()
+
     def add_message(self, who, message, mine=False, error=False):
         self.messages.append((who, message))
-        self.rows.addWidget(Message(who, message, self.sprites.frame("idle", 0), mine, error))
+        self.rows.addWidget(Message(who, message, self.sprites.frame("idle", 0), mine, error,
+                                    self.sprites.manifest.get("avatar_crop")))
         QTimer.singleShot(0, self.scroll_to_bottom)
 
     def scroll_to_bottom(self, *args):

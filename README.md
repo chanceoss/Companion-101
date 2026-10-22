@@ -30,6 +30,20 @@ The **small gear button in the upper-right corner opens Preferences**. You can a
 
 Closing the main panel keeps the pet alive. Use **Quit Biscuit** in Preferences or **Quit Biscuit** in the tray menu to exit. A second launch brings the existing companion back instead of creating another pet. The pet has no taskbar button; its control panel has one.
 
+### Choose Biscuit or Tori
+
+Open **gear → General → Companion**, choose **Tori · Tortoise**, and click **Save preferences**. Choose **Biscuit · Original companion** to switch back. The selection is remembered on restart. Default names follow the selected character; a custom name stays yours.
+
+Tori is based on the supplied tortoise reference, with 24 transparent poses covering directional walking, sitting, stretching, yawning, hopping, dancing, sleeping, working, exploring, greeting, and conversation expressions. Tori uses a **Shell wiggle** reaction instead of a tail wag. Existing activity and conversation animation transitions apply to both companions.
+
+The desktop pet, portrait, activity tiles, chat avatars, and tray icon change together. Switching preserves your conversation, AI connection, desktop position, current activity, and focus timer. New AI requests describe the selected character; offline replies work with either companion. No restart or image-generation service is needed to switch.
+
+![Tori in the native companion panel](docs/tori-panel.png)
+
+![Tori conversation reactions](docs/tori-conversation-expressions.gif)
+
+These assets are bundled with source and future Windows builds. An older executable needs to be replaced with a build containing this update, or run the latest source using **Start Biscuit.bat**.
+
 ## Companion activities
 
 Choose an illustrated activity tile in the sidebar or compact activity strip, or choose the same activity from the pet's right-click/tray menu. The cards are labeled **Explore**, **Work**, **Hi**, **Nap**, and **Follow**. Explore has one panel control: its tile toggles roaming and stays synchronized with the tray menu and remembered preference. The active tile is highlighted and the hero portrait changes to match. Clicking the large portrait gives Biscuit a little affection.

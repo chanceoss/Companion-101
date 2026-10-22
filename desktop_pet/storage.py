@@ -9,12 +9,15 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from PySide6.QtCore import QStandardPaths
 
+from .avatars import AVATARS, avatar_spec
+
 DEFAULTS = {
     "scale": 100,
     "wander": False,
     "reminders": False,
     "chat_reactions": True,
     "name": "Biscuit",
+    "avatar": "biscuit",
     "provider": False,
     "endpoint": "https://api.openai.com/v1",
     "model": "gpt-4o-mini",
@@ -77,7 +80,9 @@ def normalize_settings(raw):
             if not isinstance(result[key], str):
                 result[key] = default
             result[key] = result[key][:4096]
-    result["name"] = result["name"][:30].strip() or "Biscuit"
+    if result["avatar"] not in AVATARS:
+        result["avatar"] = "biscuit"
+    result["name"] = result["name"][:30].strip() or avatar_spec(result["avatar"]).name
     for key in ("x", "y"):
         if key in result and (
             isinstance(result[key], bool) or not isinstance(result[key], int)
